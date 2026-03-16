@@ -54,11 +54,9 @@ Deno.serve(async (req: Request) => {
 
     if (user_id === "undefined" || !user_id) user_id = null;
 
-    console.log(`[PROCESS] New report request from user: ${user_id || 'anonymous'}`);
-
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY environment variable is not set.");
 
-    // 1. Initial AI Analysis & Fake Detection & Visual Fingerprinting
+    // 1. Initial AI Analysis & Fake Detection
     const analysisPrompt = `Act as a senior civic engineer and security analyst. 
     Analyze this civic complaint description and image (if provided).
     
@@ -68,14 +66,14 @@ Deno.serve(async (req: Request) => {
     3. If genuine, provide 1-5 scores for severity, urgency, and public_impact.
     4. Provide a 1-sentence AI Summary.
     5. Provide a Resolution Prediction (e.g., "7 days").
-    6. Provide a DETAILED Visual Description/Fingerprint of the physical problem to help with duplicate detection.
+    6. Provide a DETAILED Visual Description/Fingerprint of the physical problem.
 
     Description: ${description || "No description provided."}
 
     Return ONLY raw JSON:
     { 
       "is_fake": boolean, 
-      "rejection_reason": string (if is_fake is true),
+      "rejection_reason": string,
       "category": string, 
       "severity": number, 
       "urgency": number, 
@@ -87,34 +85,25 @@ Deno.serve(async (req: Request) => {
 
     const parts: any[] = [{ text: analysisPrompt }];
     if (image_url) {
-      console.log(`[DEBUG] Fetching image from storage: ${image_url}`);
       try {
         const { data } = supabase.storage.from("complaint-images").getPublicUrl(image_url);
-        const publicUrl = data?.publicUrl;
-        if (publicUrl) {
-          console.log(`[DEBUG] Public URL: ${publicUrl}`);
-          const imgRes = await fetch(publicUrl);
+        if (data?.publicUrl) {
+          const imgRes = await fetch(data.publicUrl);
           if (imgRes.ok) {
             const buf = await imgRes.arrayBuffer();
-            const base64 = uint8ArrayToBase64(new Uint8Array(buf));
             parts.push({ 
               inlineData: { 
                 mimeType: imgRes.headers.get("Content-Type") || "image/jpeg", 
-                data: base64 
+                data: uint8ArrayToBase64(new Uint8Array(buf)) 
               } 
             });
-            console.log(`[DEBUG] Image attached to Gemini prompt`);
-          } else {
-            console.error(`[DEBUG] Failed to fetch image: ${imgRes.status}`);
           }
         }
-      } catch (imgErr: any) {
-        console.warn(`[PROCESS] Non-fatal image error: ${imgErr.message}`);
-      }
+      } catch (e) {}
     }
 
-    const gUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-    console.log(`[DEBUG] Calling Gemini API...`);
+    // Using gemini-flash-latest and v1beta as it is more stable for free tier
+    const gUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
     
     const gRes = await fetch(gUrl, {
       method: "POST",
@@ -128,165 +117,83 @@ Deno.serve(async (req: Request) => {
       })
     });
 
-    if (!gRes.ok) {
-      const errText = await gRes.text();
-      console.error(`[DEBUG] Gemini API Error Response: ${errText}`);
-      throw new Error(`Gemini API Error: ${errText}`);
-    }
+    if (!gRes.ok) throw new Error(`Gemini API Error: ${await gRes.text()}`);
     
     const gData = await gRes.json();
-    console.log(`[DEBUG] Gemini response received`);
-    
-    if (!gData.candidates?.[0]?.content?.parts?.[0]?.text) {
-      console.error(`[DEBUG] Unexpected Gemini response structure: ${JSON.stringify(gData)}`);
-      throw new Error("Gemini returned empty or malformed response.");
-    }
-
     const aiText = gData.candidates[0].content.parts[0].text;
-    let aiData;
-    try {
-      aiData = JSON.parse(aiText.replace(/```json\n?/, "").replace(/\n?```/, "").trim());
-    } catch (parseErr: any) {
-      console.error(`[DEBUG] JSON Parse Error for AI text: ${aiText}`);
-      throw new Error(`Failed to parse AI response: ${parseErr.message}`);
-    }
+    const aiData = JSON.parse(aiText.trim());
 
-    // 2. Handle Fake Complaints
     if (aiData.is_fake) {
-      console.log(`[PROCESS] Fake complaint detected: ${aiData.rejection_reason}`);
       return new Response(JSON.stringify({ 
         success: false, 
-        error: aiData.rejection_reason || "This report was identified as suspicious or invalid.",
+        error: aiData.rejection_reason || "Invalid report content.",
         status: "rejected"
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 3. Duplicate Detection via Spatial + Visual Similarity
-    console.log(`[DEBUG] Checking for duplicates near ${latitude}, ${longitude}...`);
-    const { data: candidates, error: rpcError } = await supabase.rpc('get_nearby_issues', {
-      lat: latitude,
-      lng: longitude,
-      radius_meters: 100,
-      target_category: aiData.category
+    // 2. Duplicate Detection
+    const { data: candidates } = await supabase.rpc('get_nearby_issues', {
+      lat: latitude, lng: longitude, radius_meters: 100, target_category: aiData.category
     });
-
-    if (rpcError) {
-      console.error(`[DEBUG] RPC Error: ${rpcError.message}`);
-      throw rpcError;
-    }
 
     let matchedIssueId = null;
     if (candidates && candidates.length > 0) {
-      console.log(`[DEBUG] Found ${candidates.length} candidate duplicates. Asking Gemini to compare...`);
-      const matchPrompt = `Compare this new report with existing issues. Is it the SAME physical problem?
-      New: ${aiData.visual_description}
-      Existing:
-      ${candidates.map((c: any, idx: number) => `${idx}. ${c.visual_description}`).join('\n')}
-      Return index number (0, 1...) or "none".`;
-
+      const matchPrompt = `Is it the SAME physical problem? New: ${aiData.visual_description}. Existing: ${candidates.map((c: any, i: number) => `${i}. ${c.visual_description}`).join('\n')}. Return index or "none".`;
       const mRes = await fetch(gUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ parts: [{ text: matchPrompt }] }], generationConfig: { temperature: 0.1 } })
       });
-
       if (mRes.ok) {
         const mData = await mRes.json();
-        const matchText = mData.candidates?.[0]?.content?.parts?.[0]?.text?.trim()?.toLowerCase();
-        console.log(`[DEBUG] Gemini match result: ${matchText}`);
-        const matchIdx = parseInt(matchText);
-        if (!isNaN(matchIdx) && candidates[matchIdx]) {
-          matchedIssueId = candidates[matchIdx].id;
-          console.log(`[DEBUG] Matched with issue ID: ${matchedIssueId}`);
-        }
+        const mText = mData.candidates?.[0]?.content?.parts?.[0]?.text?.trim()?.toLowerCase();
+        const mIdx = parseInt(mText);
+        if (!isNaN(mIdx) && candidates[mIdx]) matchedIssueId = candidates[mIdx].id;
       }
     }
 
-    // 4. Same-User Check
     if (matchedIssueId && user_id) {
-      const { data: existingReport } = await supabase
-        .from("reports")
-        .select("id, created_at")
-        .eq("issue_id", matchedIssueId)
-        .eq("user_id", user_id)
-        .maybeSingle();
-
-      if (existingReport) {
-        return new Response(JSON.stringify({ 
-          success: false, 
-          error: "Complaint already submitted.",
-          status: "duplicate_user"
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      const { data: existing } = await supabase.from("reports").select("id").eq("issue_id", matchedIssueId).eq("user_id", user_id).maybeSingle();
+      if (existing) return new Response(JSON.stringify({ success: false, error: "Duplicate report.", status: "duplicate_user" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 5. Create/Update Issue and Insert Report
+    // 3. Create/Update Issue
     let finalIssueId = matchedIssueId;
     let status = matchedIssueId ? "matched" : "new";
 
-    const calculateScore = (sev: number, urg: number, imp: number, count: number) => {
-      return (sev * 0.4) + (urg * 0.4) + (imp * 0.2) + (Math.log10(count) * 0.5);
-    };
-
     if (!finalIssueId) {
-      const initialScore = calculateScore(aiData.severity, aiData.urgency, aiData.public_impact, 1);
       const { data: newIssue, error: iErr } = await supabase.from("issues").insert({
         title: aiData.ai_summary.substring(0, 50),
         category: aiData.category,
         severity: aiData.severity,
         urgency: aiData.urgency,
         public_impact: aiData.public_impact,
-        priority_score: initialScore,
+        priority_score: (aiData.severity * 0.4) + (aiData.urgency * 0.4) + (aiData.public_impact * 0.2),
         report_count: 1,
-        unique_user_count: 1,
-        latitude,
-        longitude,
-        location_label,
+        latitude, longitude, location_label,
         ai_summary: aiData.ai_summary,
         visual_description: aiData.visual_description,
         department_id: DEPT_MAPPING[aiData.category] || null,
-        status: "pending",
         image_url
       }).select().single();
-      
       if (iErr) throw iErr;
       finalIssueId = newIssue.id;
     } else {
-      const { data: issue } = await supabase.from("issues").select("*").eq("id", finalIssueId).single();
-      const newCount = (issue.report_count || 0) + 1;
-      const newUsers = (issue.unique_user_count || 1) + 1;
-      const newScore = calculateScore(issue.severity, issue.urgency, issue.public_impact, newUsers);
-      
-      await supabase.from("issues").update({
-        report_count: newCount,
-        unique_user_count: newUsers,
-        priority_score: newScore,
-        last_report_at: new Date().toISOString()
-      }).eq("id", finalIssueId);
+      await supabase.from("issues").update({ last_report_at: new Date().toISOString() }).eq("id", finalIssueId);
     }
 
+    // 4. Create Report
     const { data: report, error: rErr } = await supabase.from("reports").insert({
       title: aiData.ai_summary.substring(0, 50),
-      description,
-      image_url,
-      user_id,
-      issue_id: finalIssueId,
-      latitude,
-      longitude,
-      location_label,
+      description, image_url, user_id, issue_id: finalIssueId,
+      latitude, longitude, location_label,
       analysis_status: "completed"
     }).select().single();
-
     if (rErr) throw rErr;
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      status, 
-      data: { ...aiData, issue_id: finalIssueId, report_id: report.id, summary: aiData.ai_summary } 
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ success: true, status, data: { ...aiData, summary: aiData.ai_summary } }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (e: any) {
-    console.error(`[ERROR] ${e.message}`);
     return new Response(JSON.stringify({ success: false, error: e.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });

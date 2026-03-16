@@ -65,154 +65,116 @@ const ReportIssue = () => {
   };
 
   const handleSubmit = async () => {
+    // MANDATORY LOCATION CHECK
+    if (!location.lat || !location.lng || !location.label) {
+      setErrorState("Location is mandatory. Please select or provide a location before submitting.");
+      return;
+    }
+
     setLoading(true);
+    setErrorState(null);
+
     try {
-      // 0. Verify Session before starting any work
-      console.log("[AUTH] Verifying session before starting submission...");
-      // getUser() is better than getSession() here because it validates the JWT with the server
+      // 0. Verify Session
       const { data: authData, error: authError } = await supabase.auth.getUser();
       
       if (authError || !authData.user) {
-        console.error("[AUTH ERROR] getUser failed:", authError);
-        const isJwtError = authError?.message?.toLowerCase().includes('jwt') || authError?.status === 401;
-        
-        if (isJwtError) {
-          setErrorState("Your session is invalid (Invalid JWT). Cleaning up session, please sign in again...");
-          setTimeout(async () => {
-            await supabase.auth.signOut();
-            window.location.href = '/login';
-          }, 3000);
-        } else {
-          setErrorState("You must be signed in to report an issue. Please sign in again.");
-        }
+        setErrorState("You must be signed in to report an issue.");
         setLoading(false);
         return;
       }
 
       const activeUser = authData.user;
 
-      // 1. Upload Image to Supabase Storage
+      // 1. Upload Image
       let imageUrl = null;
       if (image) {
-        console.log(`[STORAGE] Uploading ${image.name} for user ${activeUser.id}...`);
         const fileExt = image.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
         const { error: uploadError, data } = await supabase.storage
           .from('complaint-images')
           .upload(fileName, image);
         
-        if (uploadError) {
-          console.error("[STORAGE ERROR]", uploadError);
-          // Special handling for JWT errors in Storage
-          if (uploadError.message?.includes('JWT') || uploadError.status === 401) {
-             setErrorState("Authentication error (Invalid JWT) during upload. Redirecting to login...");
-             setTimeout(async () => {
-               await supabase.auth.signOut();
-               window.location.href = '/login';
-             }, 3000);
-          } else {
-             setErrorState(`Storage Error: ${uploadError.message}`);
-          }
-          throw uploadError;
-        }
+        if (uploadError) throw uploadError;
         imageUrl = data.path;
-        console.log(`[STORAGE] Upload success: ${imageUrl}`);
       }
 
       // 2. Trigger AI Processing
       setAiProcessing(true);
       
-      try {
-        const finalUserId = activeUser.id;
-        console.log(`[SUBMIT] Invoking edge function. User: ${finalUserId}`);
-        
-        const payload = { 
-          user_id: finalUserId,
-          title: title || description.substring(0, 30) + '...',
-          description: description,
-          image_url: imageUrl,
-          latitude: location.lat,
-          longitude: location.lng,
-          location_label: location.label
-        };
-        console.log("[SUBMIT] Payload:", JSON.stringify(payload, null, 2));
+      const payload = { 
+        user_id: activeUser.id,
+        description: description,
+        image_url: imageUrl,
+        latitude: location.lat,
+        longitude: location.lng,
+        location_label: location.label
+      };
 
-        const { data: aiResponse, error: aiError } = await supabase.functions.invoke('process-complaint', {
-          body: payload
-        });
+      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('process-complaint-v15-debug-fix-v2', {
+        body: payload
+      });
 
-        if (aiError) {
-          console.error("[INVOKE ERROR]", aiError);
-          // Check if function invocation returned a JWT error
-          if (aiError.message?.includes('JWT') || aiError.status === 401) {
-             setErrorState("Session expired (Invalid JWT). Please sign in again.");
-             setTimeout(() => {
-                supabase.auth.signOut();
-                window.location.href = '/login';
-             }, 2000);
-             return;
-          }
-          throw aiError;
-        }
-
-        if (aiResponse?.status === 'duplicate_user') {
-          console.log(`[SUBMIT] Duplicate detected. Blocking.`);
-          setSubmissionStatus('duplicate');
-          setErrorState(aiResponse.error || "Complaint already submitted.");
-          setAiProcessing(false);
-          setLoading(false);
-          return; // Exit early, do not setSubmitted(true)
-        } else if (aiResponse?.status === 'matched') {
-          console.log(`[SUBMIT] Matched existing issue.`);
-          setSubmissionStatus('matched');
-          setAiResult(aiResponse.data);
-        } else {
-          console.log(`[SUBMIT] New issue created.`);
-          setSubmissionStatus('new');
-          setAiResult(aiResponse.data);
-        }
-      } catch (invokeErr) {
-        console.error(`[AI ERROR] Logic failed:`, invokeErr);
+      // IMPROVED ERROR HANDLING
+      if (aiError) {
+        console.error("Edge Function Invoke Error:", aiError);
         
-        // Extract real error message from Supabase function response
-        let displayError = invokeErr.message;
+        // Try to extract the real error message if it's a response error
+        let errorMessage = "AI processing failed. Please try again.";
         
-        // Try various ways supabase-js packs the error body
-        if (invokeErr.context && typeof invokeErr.context.json === 'function') {
-          try {
-            const errorBody = await invokeErr.context.json();
-            displayError = errorBody.error || errorBody.message || displayError;
-          } catch (e) {
-            console.warn("Could not parse error context as JSON", e);
-          }
-        } else if (invokeErr.context?.response) {
-           try {
-            const errorBody = await invokeErr.context.response.json();
-            displayError = errorBody.error || errorBody.message || displayError;
-          } catch (e) {}
+        if (aiError.context?.json) {
+           errorMessage = aiError.context.json.error || errorMessage;
+        } else if (aiError.message) {
+           errorMessage = aiError.message;
         }
         
-        setErrorState(displayError || "AI Analysis failed");
+        setErrorState(errorMessage);
         setAiProcessing(false);
         setLoading(false);
-        return; 
+        return;
+      }
+
+      if (aiResponse?.success === false) {
+        setErrorState(aiResponse.error || "AI Analysis failed to process this report.");
+        setAiProcessing(false);
+        setLoading(false);
+        return;
+      }
+
+      if (aiResponse?.status === 'rejected') {
+        setErrorState(aiResponse.error || "Report rejected by AI analysis.");
+        setAiProcessing(false);
+        setLoading(false);
+        return;
+      }
+
+      if (aiResponse?.status === 'duplicate_user') {
+        setSubmissionStatus('duplicate');
+        setErrorState(aiResponse.error || "You have already submitted a report for this issue.");
+        setAiProcessing(false);
+        setLoading(false);
+        return;
+      }
+
+      if (aiResponse?.status === 'matched') {
+        setSubmissionStatus('matched');
+        setAiResult(aiResponse.data);
+      } else {
+        setSubmissionStatus('new');
+        setAiResult(aiResponse.data);
       }
 
       setSubmitted(true);
-      setErrorState(null); 
     } catch (err) {
       console.error("Submission error:", err);
-      let errMsg = err.message;
-      
-      // Also check if err has context (e.g. storage error)
-      if (err.context && typeof err.context.json === 'function') {
-         try {
-           const body = await err.context.json();
-           errMsg = body.error || body.message || errMsg;
-         } catch(e) {}
+      // DISTINGUISH ERRORS
+      if (err.message?.includes('JWT')) {
+        setErrorState("Your session has expired. Please sign in again.");
+      } else if (err.message?.includes('storage')) {
+        setErrorState("Failed to upload image. Please check your connection.");
+      } else {
+        setErrorState(err.message || "Connection failed. Please try again.");
       }
-      
-      setErrorState(errMsg || "Connection failed. Please check your network.");
     } finally {
       setLoading(false);
       setAiProcessing(false);
