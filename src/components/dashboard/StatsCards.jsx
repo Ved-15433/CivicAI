@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { AlertCircle, Clock, CheckCircle2, FileText, Users } from 'lucide-react';
 
-const StatsCards = ({ stats }) => {
+const StatsCards = React.memo(({ stats }) => {
   const cards = [
     { 
       label: 'Total Reports', 
@@ -79,6 +79,6 @@ const StatsCards = ({ stats }) => {
       ))}
     </div>
   );
-};
+});
 
 export default StatsCards;

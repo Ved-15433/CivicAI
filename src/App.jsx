@@ -4,35 +4,41 @@ import ReportIssue from './pages/ReportIssue';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import { IssueProvider } from './context/IssueContext';
+import DashboardLayout from './components/layout/DashboardLayout';
+import RootLayout from './components/layout/RootLayout';
 
 function App() {
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route 
-          path="/report" 
-          element={
-            <ProtectedRoute>
-              <ReportIssue />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/dashboard" 
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } 
-        >
-          <Route index element={<Navigate to="analytics" replace />} />
-          <Route path="analytics" element={null} />
-          <Route path="feed" element={null} />
-          <Route path="my-complaints" element={null} />
-        </Route>
-      </Routes>
+      <IssueProvider>
+        <RootLayout>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            
+            {/* Protected Routes with Persistent Shell */}
+            <Route 
+              path="/" 
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="report" element={<ReportIssue />} />
+              <Route path="dashboard" element={<Dashboard />}>
+                <Route index element={<Navigate to="analytics" replace />} />
+                <Route path="analytics" element={null} />
+                <Route path="feed" element={null} />
+                <Route path="my-complaints" element={null} />
+              </Route>
+            </Route>
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </RootLayout>
+      </IssueProvider>
     </Router>
   );
 }

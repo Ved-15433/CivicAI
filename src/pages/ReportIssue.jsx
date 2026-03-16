@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, MapPin, Send, ArrowLeft, Loader2, CheckCircle2, Brain, Sparkles, AlertCircle, Clock, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import BackgroundEffects from '../components/landing/BackgroundEffects';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { useIssues } from '../context/IssueContext';
 
 const ReportIssue = () => {
+  const navigate = useNavigate();
+  const { refreshData, refreshUserReports } = useIssues();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [aiProcessing, setAiProcessing] = useState(false);
@@ -156,14 +158,13 @@ const ReportIssue = () => {
         return;
       }
 
-      if (aiResponse?.status === 'matched') {
-        setSubmissionStatus('matched');
-        setAiResult(aiResponse.data);
-      } else {
-        setSubmissionStatus('new');
-        setAiResult(aiResponse.data);
-      }
+      setSubmissionStatus(aiResponse?.status === 'matched' ? 'matched' : 'new');
+      setAiResult(aiResponse.data);
 
+      // Refresh global state so dashboard is updated immediately
+      refreshData();
+      refreshUserReports();
+      
       setSubmitted(true);
     } catch (err) {
       console.error("Submission error:", err);
@@ -183,7 +184,6 @@ const ReportIssue = () => {
 
   return (
     <div className="min-h-screen pt-20 pb-12 relative overflow-hidden selection:bg-blue-500/30">
-      <BackgroundEffects />
       
       <div className="container px-6 mx-auto max-w-2xl relative z-10">
         <Link to="/" className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-8 group">
@@ -546,12 +546,12 @@ const ReportIssue = () => {
                 )}
 
                 <div className="flex flex-col gap-4">
-                  <Link to="/" className="w-full py-5 bg-blue-600 hover:bg-blue-500 text-white rounded-[1.25rem] font-bold transition-all shadow-xl shadow-blue-500/20 active:scale-95">
+                  <Link to="/" className="w-full py-5 bg-blue-600 hover:bg-blue-500 text-white rounded-[1.25rem] font-bold transition-all shadow-xl shadow-blue-500/20 active:scale-95 flex items-center justify-center">
                     Return to Home
                   </Link>
-                  <button className="w-full py-5 glass text-white rounded-[1.25rem] font-bold hover:bg-white/5 transition-colors">
+                  <Link to="/dashboard/my-complaints" className="w-full py-5 glass text-white rounded-[1.25rem] font-bold hover:bg-white/5 transition-colors flex items-center justify-center">
                     Track Report Status
-                  </button>
+                  </Link>
                 </div>
               </motion.div>
             )}

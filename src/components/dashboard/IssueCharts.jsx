@@ -6,7 +6,7 @@ import {
   LineChart, Line
 } from 'recharts';
 
-const IssueCharts = ({ categoryData, severityData, timelineData }) => {
+const IssueCharts = React.memo(({ categoryData, severityData, timelineData }) => {
   const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1'];
 
   const CustomTooltip = ({ active, payload, label }) => {
@@ -37,6 +37,7 @@ const IssueCharts = ({ categoryData, severityData, timelineData }) => {
                 outerRadius={80}
                 paddingAngle={5}
                 dataKey="value"
+                isAnimationActive={false}
               >
                 {categoryData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -75,7 +76,7 @@ const IssueCharts = ({ categoryData, severityData, timelineData }) => {
                 tick={{ fill: '#64748b', fontSize: 10 }}
               />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
-              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+              <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive={false}>
                 {severityData.map((entry, index) => (
                   <Cell 
                     key={`cell-${index}`} 
@@ -114,6 +115,7 @@ const IssueCharts = ({ categoryData, severityData, timelineData }) => {
                 strokeWidth={3} 
                 dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#0f172a' }}
                 activeDot={{ r: 6, strokeWidth: 0 }}
+                isAnimationActive={false}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -121,6 +123,6 @@ const IssueCharts = ({ categoryData, severityData, timelineData }) => {
       </div>
     </div>
   );
-};
+});
 
 export default IssueCharts;

@@ -47,6 +47,7 @@ const IssueList = React.memo(({ issues }) => {
           {issues.map((issue, index) => (
             <motion.div
               key={issue.id}
+              layout
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.2 }}
               onClick={() => setSelectedIssue(issue)}

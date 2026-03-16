@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   PlusCircle, 
@@ -17,63 +17,14 @@ import {
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import IssueDetailModal from './IssueDetailModal';
+import { useIssues } from '../../context/IssueContext';
 
 const UserComplaints = React.memo(({ userId }) => {
-  const [complaints, setComplaints] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { userReports: complaints, userReportsLoading: loading } = useIssues();
   const [deletingId, setDeletingId] = useState(null);
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [issueToDelete, setIssueToDelete] = useState(null);
-
-  const fetchUserComplaints = async () => {
-    if (!userId) return;
-    try {
-      const { data, error } = await supabase
-        .from('reports')
-        .select('*, issues(*, departments(name))')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setComplaints(data || []);
-    } catch (err) {
-      console.error('Error fetching user complaints:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUserComplaints();
-
-    // Subscribe to realtime changes
-    const channel = supabase
-      .channel('my_complaints_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'reports',
-          filter: `user_id=eq.${userId}`
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setComplaints(prev => [payload.new, ...prev]);
-          } else if (payload.eventType === 'DELETE') {
-            setComplaints(prev => prev.filter(c => c.id !== payload.old.id));
-          } else if (payload.eventType === 'UPDATE') {
-            setComplaints(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId]);
 
   const handleDelete = async () => {
     if (!issueToDelete) return;
@@ -85,7 +36,6 @@ const UserComplaints = React.memo(({ userId }) => {
         .eq('id', issueToDelete);
 
       if (error) throw error;
-      setComplaints(prev => prev.filter(c => c.id !== issueToDelete));
       setShowConfirm(false);
       setIssueToDelete(null);
     } catch (err) {
@@ -113,7 +63,7 @@ const UserComplaints = React.memo(({ userId }) => {
     }
   };
 
-  if (loading) {
+  if (loading && complaints.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-4" />
@@ -123,7 +73,7 @@ const UserComplaints = React.memo(({ userId }) => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 h-full">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 mb-2">
@@ -143,122 +93,126 @@ const UserComplaints = React.memo(({ userId }) => {
         </Link>
       </header>
 
-      {complaints.length === 0 ? (
-        <div className="text-center py-20 rounded-[2.5rem] glass border border-white/5 bg-slate-900/20">
-          <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="text-slate-700 w-10 h-10" />
+      <div className="pb-10">
+        {complaints.length === 0 ? (
+          <div className="text-center py-20 rounded-[2.5rem] glass border border-white/5 bg-slate-900/20">
+            <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <AlertCircle className="text-slate-700 w-10 h-10" />
+            </div>
+            <h3 className="text-white font-black text-2xl mb-2">No Reports Yet</h3>
+            <p className="text-slate-500 max-w-sm mx-auto mb-8 font-medium">
+              You haven't submitted any civic issues. Your reports help make the city better for everyone.
+            </p>
+            <Link to="/report" className="text-blue-400 font-black uppercase tracking-widest text-sm hover:underline">
+              Submit your first report
+            </Link>
           </div>
-          <h3 className="text-white font-black text-2xl mb-2">No Reports Yet</h3>
-          <p className="text-slate-500 max-w-sm mx-auto mb-8 font-medium">
-            You haven't submitted any civic issues. Your reports help make the city better for everyone.
-          </p>
-          <Link to="/report" className="text-blue-400 font-black uppercase tracking-widest text-sm hover:underline">
-            Submit your first report
-          </Link>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4">
-          <AnimatePresence mode="popLayout">
-            {complaints.map((issue) => (
-              <motion.div
-                key={issue.id}
-                layout
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="group relative bg-slate-900/40 border border-white/5 rounded-3xl p-6 hover:bg-white/5 hover:border-white/10 transition-all flex flex-col md:flex-row items-center gap-6"
-              >
-                {/* Thumbnail */}
-                <div className="w-full md:w-24 h-24 rounded-2xl bg-slate-950 overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => setSelectedIssue(issue.issues || issue)}>
-                  {issue.image_url ? (
-                    <img 
-                      src={`https://ethoqrgqgjpgbwdfwizn.supabase.co/storage/v1/object/public/complaint-images/${issue.image_url}`} 
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      alt=""
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-800">
-                      <Brain className="w-8 h-8 opacity-20" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-grow min-w-0 w-full cursor-pointer" onClick={() => setSelectedIssue(issue.issues || issue)}>
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter bg-white/5 text-slate-500`}>
-                      {issue.issues?.category || issue.category || 'Triage'}
-                    </span>
-                    <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-                       {new Date(issue.created_at).toLocaleDateString()}
-                    </span>
-                    {(issue.issues?.location_label || issue.location_label) && (
-                      <>
-                        <span className="w-1 h-1 rounded-full bg-slate-700" />
-                        <div className="flex items-center gap-1 text-slate-500">
-                          <MapPin className="w-2.5 h-2.5" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest truncate max-w-[150px]">
-                            {issue.issues?.location_label || issue.location_label}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  <h4 className="text-white font-bold text-lg truncate group-hover:text-blue-400 transition-colors">
-                    {issue.title || issue.issues?.title}
-                  </h4>
-                  <div className="flex items-center gap-4 mt-2">
-                    <div className="flex items-center gap-1.5">
-                      {getStatusIcon(issue.issues?.analysis_status || issue.analysis_status)}
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                        {getStatusLabel(issue.issues?.analysis_status || issue.analysis_status)}
-                      </span>
-                    </div>
-                    {(issue.issues?.priority_score || issue.priority_score) && (
-                      <div className="flex items-center gap-1.5 text-blue-400">
-                        <Sparkles className="w-3 h-3" />
-                        <span className="text-xs font-black uppercase tracking-tighter">
-                          Score: {(issue.issues?.priority_score || issue.priority_score).toFixed(1)}
-                        </span>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {complaints.map((issue) => (
+                <motion.div
+                  key={issue.id}
+                  layout
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="group relative bg-slate-900/40 border border-white/5 rounded-3xl p-6 hover:bg-white/5 hover:border-white/10 transition-all flex flex-col md:flex-row items-center gap-6"
+                >
+                  {/* Thumbnail */}
+                  <div className="w-full md:w-24 h-24 rounded-2xl bg-slate-950 overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => setSelectedIssue(issue.issues || issue)}>
+                    {issue.image_url ? (
+                      <img 
+                        src={`https://ethoqrgqgjpgbwdfwizn.supabase.co/storage/v1/object/public/complaint-images/${issue.image_url}`} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        alt=""
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-800">
+                        <Brain className="w-8 h-8 opacity-20" />
                       </div>
                     )}
-                    <div className="flex items-center gap-1.5 text-indigo-400 bg-indigo-500/5 px-2 py-0.5 rounded-lg border border-indigo-500/10">
-                      <Users className="w-3 h-3" />
-                      <span className="text-[10px] font-black uppercase tracking-tighter">
-                        {issue.issues?.unique_user_count || 1} { (issue.issues?.unique_user_count || 1) === 1 ? 'citizen' : 'citizens' }
-                      </span>
-                    </div>
-                    {issue.issues?.unique_user_count > 1 && (
-                      <span className="text-[10px] font-bold text-slate-500 italic">
-                        (Merged into existing issue)
-                      </span>
-                    )}
                   </div>
-                </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                   <button 
-                    onClick={(e) => {
-                       e.stopPropagation();
-                       setIssueToDelete(issue.id);
-                       setShowConfirm(true);
-                    }}
-                    className="p-3 rounded-2xl bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/10"
-                   >
-                     <Trash2 className="w-5 h-5" />
-                   </button>
-                   <button 
-                    onClick={() => setSelectedIssue(issue.issues || issue)}
-                    className="p-3 rounded-2xl bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-                   >
-                     <ChevronRight className="w-5 h-5 flex-shrink-0" />
-                   </button>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
+                  {/* Info */}
+                  <div className="flex-grow min-w-0 w-full cursor-pointer" onClick={() => setSelectedIssue(issue.issues || issue)}>
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter bg-white/5 text-slate-500`}>
+                        {issue.issues?.category || issue.category || 'Triage'}
+                      </span>
+                      <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">
+                         {new Date(issue.created_at).toLocaleDateString()}
+                      </span>
+                      {(issue.issues?.location_label || issue.location_label) && (
+                        <>
+                          <span className="w-1 h-1 rounded-full bg-slate-700" />
+                          <div className="flex items-center gap-1 text-slate-500">
+                            <MapPin className="w-2.5 h-2.5" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest truncate max-w-[150px]">
+                              {issue.issues?.location_label || issue.location_label}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <h4 className="text-white font-bold text-lg truncate group-hover:text-blue-400 transition-colors">
+                      {issue.title || issue.issues?.title}
+                    </h4>
+                    <div className="flex items-center gap-4 mt-2">
+                      <div className="flex items-center gap-1.5">
+                        {getStatusIcon(issue.issues?.analysis_status || issue.analysis_status)}
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                          {getStatusLabel(issue.issues?.analysis_status || issue.analysis_status)}
+                        </span>
+                      </div>
+                      {(issue.issues?.priority_score || issue.priority_score) && (
+                        <div className="flex items-center gap-1.5 text-blue-400">
+                          <Sparkles className="w-3 h-3" />
+                          <span className="text-xs font-black uppercase tracking-tighter">
+                            Score: {(issue.issues?.priority_score || issue.priority_score).toFixed(1)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5 text-indigo-400 bg-indigo-500/5 px-2 py-0.5 rounded-lg border border-indigo-500/10">
+                        <Users className="w-3 h-3" />
+                        <span className="text-[10px] font-black uppercase tracking-tighter">
+                          {issue.issues?.unique_user_count || 1} { (issue.issues?.unique_user_count || 1) === 1 ? 'citizen' : 'citizens' }
+                        </span>
+                      </div>
+                      {(issue.issues?.unique_user_count || 0) > 1 && (
+                        <span className="hidden sm:inline text-[10px] font-bold text-slate-500 italic">
+                          (Merged into existing issue)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-3 w-full md:w-auto">
+                     <button 
+                      onClick={(e) => {
+                         e.stopPropagation();
+                         setIssueToDelete(issue.id);
+                         setShowConfirm(true);
+                      }}
+                      className="p-3 rounded-2xl bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/10"
+                     >
+                       <Trash2 className="w-5 h-5" />
+                     </button>
+                     <button 
+                      onClick={() => setSelectedIssue(issue.issues || issue)}
+                      className="p-3 rounded-2xl bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                     >
+                       <ChevronRight className="w-5 h-5 flex-shrink-0" />
+                     </button>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
 
       {/* Confirmation Modal */}
       <AnimatePresence>

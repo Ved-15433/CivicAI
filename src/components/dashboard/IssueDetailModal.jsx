@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { X, Shield, MapPin, Calendar, AlertCircle, Clock, Users, Sparkles, Building2 } from 'lucide-react';
 
-const IssueDetailModal = ({ issue, onClose }) => {
+const IssueDetailModal = React.memo(({ issue, onClose }) => {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* Backdrop */}
@@ -19,6 +19,7 @@ const IssueDetailModal = ({ issue, onClose }) => {
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        transition={{ type: "spring", damping: 25, stiffness: 500 }}
         className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-[2.5rem] glass border border-white/10 bg-slate-900 shadow-2xl flex flex-col md:flex-row"
       >
         {/* Left Side: Image & Key Info */}
@@ -29,6 +30,7 @@ const IssueDetailModal = ({ issue, onClose }) => {
                 src={`https://ethoqrgqgjpgbwdfwizn.supabase.co/storage/v1/object/public/complaint-images/${issue.image_url}`} 
                 alt={issue.title}
                 className="w-full h-full object-cover"
+                loading="lazy"
               />
             ) : (
               <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center text-slate-700 gap-4">
@@ -183,6 +185,6 @@ const IssueDetailModal = ({ issue, onClose }) => {
       </motion.div>
     </div>
   );
-};
+});
 
 export default IssueDetailModal;
