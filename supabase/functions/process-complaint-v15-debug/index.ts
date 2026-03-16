@@ -102,8 +102,8 @@ Deno.serve(async (req: Request) => {
       } catch (e) {}
     }
 
-    // Using gemini-flash-latest and v1beta as it is more stable for free tier
-    const gUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+    // Using gemini-2.5-flash
+    const gUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     
     const gRes = await fetch(gUrl, {
       method: "POST",

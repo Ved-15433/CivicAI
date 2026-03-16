@@ -113,7 +113,7 @@ const ReportIssue = () => {
         location_label: location.label
       };
 
-      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('process-complaint-v15-debug-fix-v2', {
+      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('process-complaint', {
         body: payload
       });
 
