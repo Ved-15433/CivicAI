@@ -29,8 +29,8 @@ const UserComplaints = React.memo(({ userId }) => {
     if (!userId) return;
     try {
       const { data, error } = await supabase
-        .from('complaints')
-        .select('*, departments(name)')
+        .from('reports')
+        .select('*, issues(*, departments(name))')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
@@ -54,7 +54,7 @@ const UserComplaints = React.memo(({ userId }) => {
         {
           event: '*',
           schema: 'public',
-          table: 'complaints',
+          table: 'reports',
           filter: `user_id=eq.${userId}`
         },
         (payload) => {
@@ -79,7 +79,7 @@ const UserComplaints = React.memo(({ userId }) => {
     setDeletingId(issueToDelete);
     try {
       const { error } = await supabase
-        .from('complaints')
+        .from('reports')
         .delete()
         .eq('id', issueToDelete);
 
@@ -166,7 +166,7 @@ const UserComplaints = React.memo(({ userId }) => {
                 className="group relative bg-slate-900/40 border border-white/5 rounded-3xl p-6 hover:bg-white/5 hover:border-white/10 transition-all flex flex-col md:flex-row items-center gap-6"
               >
                 {/* Thumbnail */}
-                <div className="w-full md:w-24 h-24 rounded-2xl bg-slate-950 overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => setSelectedIssue(issue)}>
+                <div className="w-full md:w-24 h-24 rounded-2xl bg-slate-950 overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => setSelectedIssue(issue.issues || issue)}>
                   {issue.image_url ? (
                     <img 
                       src={`https://ethoqrgqgjpgbwdfwizn.supabase.co/storage/v1/object/public/complaint-images/${issue.image_url}`} 
@@ -182,38 +182,50 @@ const UserComplaints = React.memo(({ userId }) => {
                 </div>
 
                 {/* Info */}
-                <div className="flex-grow min-w-0 w-full cursor-pointer" onClick={() => setSelectedIssue(issue)}>
+                <div className="flex-grow min-w-0 w-full cursor-pointer" onClick={() => setSelectedIssue(issue.issues || issue)}>
                   <div className="flex items-center gap-3 mb-1">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter bg-white/5 text-slate-500`}>
-                      {issue.category || 'Triage'}
+                      {issue.issues?.category || issue.category || 'Triage'}
                     </span>
                     <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">
                        {new Date(issue.created_at).toLocaleDateString()}
                     </span>
-                    {issue.location_label && (
+                    {(issue.issues?.location_label || issue.location_label) && (
                       <>
                         <span className="w-1 h-1 rounded-full bg-slate-700" />
                         <div className="flex items-center gap-1 text-slate-500">
                           <MapPin className="w-2.5 h-2.5" />
                           <span className="text-[10px] font-bold uppercase tracking-widest truncate max-w-[150px]">
-                            {issue.location_label}
+                            {issue.issues?.location_label || issue.location_label}
                           </span>
                         </div>
                       </>
                     )}
                   </div>
-                  <h4 className="text-white font-bold text-lg truncate group-hover:text-blue-400 transition-colors">{issue.title}</h4>
+                  <h4 className="text-white font-bold text-lg truncate group-hover:text-blue-400 transition-colors">
+                    {issue.title || issue.issues?.title}
+                  </h4>
                   <div className="flex items-center gap-4 mt-2">
                     <div className="flex items-center gap-1.5">
-                      {getStatusIcon(issue.analysis_status)}
+                      {getStatusIcon(issue.issues?.analysis_status || issue.analysis_status)}
                       <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                        {getStatusLabel(issue.analysis_status)}
+                        {getStatusLabel(issue.issues?.analysis_status || issue.analysis_status)}
                       </span>
                     </div>
-                    {issue.priority_score && (
+                    {(issue.issues?.priority_score || issue.priority_score) && (
                       <div className="flex items-center gap-1.5 text-blue-400">
                         <Sparkles className="w-3 h-3" />
-                        <span className="text-xs font-black uppercase tracking-tighter">Score: {issue.priority_score.toFixed(1)}</span>
+                        <span className="text-xs font-black uppercase tracking-tighter">
+                          Score: {(issue.issues?.priority_score || issue.priority_score).toFixed(1)}
+                        </span>
+                      </div>
+                    )}
+                    {issue.issues?.report_count > 1 && (
+                      <div className="flex items-center gap-1.5 text-indigo-400">
+                        <Users className="w-3 h-3" />
+                        <span className="text-xs font-black uppercase tracking-tighter">
+                          {issue.issues.report_count} Reports
+                        </span>
                       </div>
                     )}
                   </div>
@@ -232,7 +244,7 @@ const UserComplaints = React.memo(({ userId }) => {
                      <Trash2 className="w-5 h-5" />
                    </button>
                    <button 
-                    onClick={() => setSelectedIssue(issue)}
+                    onClick={() => setSelectedIssue(issue.issues || issue)}
                     className="p-3 rounded-2xl bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
                    >
                      <ChevronRight className="w-5 h-5 flex-shrink-0" />

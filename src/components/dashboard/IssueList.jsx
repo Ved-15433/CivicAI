@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, MapPin, Calendar, ArrowRight, Star, AlertTriangle, Info } from 'lucide-react';
+import { Shield, MapPin, Calendar, ArrowRight, Star, AlertTriangle, Info, Users } from 'lucide-react';
 import IssueDetailModal from './IssueDetailModal';
 
 const IssueList = React.memo(({ issues }) => {
@@ -78,6 +78,10 @@ const IssueList = React.memo(({ issues }) => {
                   <div className="px-2 py-1 rounded-md bg-white/5 text-[10px] font-bold text-slate-400 uppercase tracking-tighter flex items-center gap-1.5">
                     <Shield className="w-3 h-3" />
                     {issue.category || 'Unclassified'}
+                  </div>
+                  <div className="px-2 py-1 rounded-md bg-blue-500/10 text-[10px] font-bold text-blue-400 uppercase tracking-tighter flex items-center gap-1.5">
+                    <Users className="w-3 h-3" />
+                    Reported by {issue.report_count || 1} citizens
                   </div>
                   {getStatusBadge(issue.status)}
                 </div>

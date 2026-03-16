@@ -14,6 +14,7 @@ const ReportIssue = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState('new'); // 'new', 'matched', 'duplicate'
   const [aiResult, setAiResult] = useState(null);
   const [errorState, setErrorState] = useState(null);
   const [location, setLocation] = useState({ lat: null, lng: null, label: '' });
@@ -33,6 +34,7 @@ const ReportIssue = () => {
         const { latitude, longitude } = position.coords;
         const address = await fetchAddress(latitude, longitude);
         setLocation({ lat: latitude, lng: longitude, label: address });
+        setErrorState(null);
         setLocating(false);
       },
       (error) => {
@@ -68,74 +70,114 @@ const ReportIssue = () => {
       // 1. Upload Image to Supabase Storage
       let imageUrl = null;
       if (image) {
+        console.log(`[STORAGE] Uploading ${image.name}...`);
         const fileExt = image.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
         const { error: uploadError, data } = await supabase.storage
           .from('complaint-images')
           .upload(fileName, image);
         
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error("[STORAGE ERROR]", uploadError);
+          throw uploadError;
+        }
         imageUrl = data.path;
+        console.log(`[STORAGE] Upload success: ${imageUrl}`);
       }
 
-      // 2. Submit Complaint to Database
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log(`[SUBMIT] Attempting insert for user: ${user?.id || 'anonymous'}`);
-
-      const { data: complaint, error: dbError } = await supabase
-        .from('complaints')
-        .insert({
-          title: title || description.substring(0, 30) + '...',
-          description: description,
-          image_url: imageUrl,
-          status: 'pending',
-          user_id: user?.id || null,
-          analysis_status: 'pending',
-          latitude: location.lat,
-          longitude: location.lng,
-          location_label: location.label
-        })
-        .select()
-        .single();
-
-      if (dbError) throw dbError;
-      console.log(`[SUBMIT] Complaint created: ${complaint.id}. Calling AI...`);
-
-      // 3. Trigger AI Processing
+      // 2. Prepare Payload & Trigger AI Processing
+      console.log("[AUTH] Getting current user...");
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.warn("[AUTH WARNING] getUser failed:", authError);
+        // We still proceed as anonymous if allowed, or we could stop here
+      }
+      const user = authData?.user;
+      
       setAiProcessing(true);
       
       try {
-        const { data: aiResponse, error: aiError } = await supabase.functions.invoke('process-complaint', {
-          body: { complaint_id: complaint.id }
+        const finalUserId = (user?.id && user.id !== 'undefined') ? user.id : null;
+        console.log(`[SUBMIT] Invoking edge function. User: ${finalUserId || 'anonymous'}`);
+        
+        const payload = { 
+          user_id: finalUserId,
+          title: title || description.substring(0, 30) + '...',
+          description: description,
+          image_url: imageUrl,
+          latitude: location.lat,
+          longitude: location.lng,
+          location_label: location.label
+        };
+        console.log("[SUBMIT] Payload:", JSON.stringify(payload, null, 2));
+
+        const { data: aiResponse, error: aiError } = await supabase.functions.invoke('process-complaint-v12-gemini-fix-v2', {
+          body: payload
         });
 
-        if (aiError) throw aiError;
-
-        if (!aiResponse?.success) {
-          throw new Error(aiResponse?.error || "AI returned unsuccessful status");
+        if (aiError) {
+          console.error("[INVOKE ERROR]", aiError);
+          throw aiError;
         }
 
-        console.log(`[SUBMIT] AI Success for ${complaint.id}:`, aiResponse.data);
-        setAiResult(aiResponse.data);
+        if (aiResponse?.status === 'duplicate_user') {
+          console.log(`[SUBMIT] Duplicate detected. Blocking.`);
+          setSubmissionStatus('duplicate');
+          setErrorState(aiResponse.error || "Complaint already submitted.");
+          setAiProcessing(false);
+          setLoading(false);
+          return; // Exit early, do not setSubmitted(true)
+        } else if (aiResponse?.status === 'matched') {
+          console.log(`[SUBMIT] Matched existing issue.`);
+          setSubmissionStatus('matched');
+          setAiResult(aiResponse.data);
+        } else {
+          console.log(`[SUBMIT] New issue created.`);
+          setSubmissionStatus('new');
+          setAiResult(aiResponse.data);
+        }
       } catch (invokeErr) {
-        console.error(`[AI ERROR] Function invocation for ${complaint.id} failed:`, invokeErr);
+        console.error(`[AI ERROR] Logic failed:`, invokeErr);
         
-        // Update DB to show failure instead of "Pending" forever
-        await supabase
-          .from('complaints')
-          .update({ 
-            analysis_status: 'failed', 
-            error_message: invokeErr.message || "AI invocation failed" 
-          })
-          .eq('id', complaint.id);
-          
-        setAiResult(null);
+        // Extract real error message from Supabase function response
+        let displayError = invokeErr.message;
+        
+        // Try various ways supabase-js packs the error body
+        if (invokeErr.context && typeof invokeErr.context.json === 'function') {
+          try {
+            const errorBody = await invokeErr.context.json();
+            displayError = errorBody.error || errorBody.message || displayError;
+          } catch (e) {
+            console.warn("Could not parse error context as JSON", e);
+          }
+        } else if (invokeErr.context?.response) {
+           try {
+            const errorBody = await invokeErr.context.response.json();
+            displayError = errorBody.error || errorBody.message || displayError;
+          } catch (e) {}
+        }
+        
+        setErrorState(displayError || "AI Analysis failed");
+        setAiProcessing(false);
+        setLoading(false);
+        return; 
       }
 
       setSubmitted(true);
+      setErrorState(null); 
     } catch (err) {
       console.error("Submission error:", err);
-      setErrorState(err.message || "Connection failed. Please check your network.");
+      let errMsg = err.message;
+      
+      // Also check if err has context (e.g. storage error)
+      if (err.context && typeof err.context.json === 'function') {
+         try {
+           const body = await err.context.json();
+           errMsg = body.error || body.message || errMsg;
+         } catch(e) {}
+      }
+      
+      setErrorState(errMsg || "Connection failed. Please check your network.");
     } finally {
       setLoading(false);
       setAiProcessing(false);
@@ -218,6 +260,22 @@ const ReportIssue = () => {
                     <p className="text-slate-400">Step {step}: {step === 1 ? 'Describe the problem' : 'Provide details'}</p>
                   </div>
 
+                  {errorState && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className={`mb-6 p-4 rounded-2xl border flex items-start gap-4 ${submissionStatus === 'duplicate' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}
+                    >
+                      <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-bold uppercase tracking-widest mb-1">
+                          {submissionStatus === 'duplicate' ? 'Duplicate Detected' : 'Issue Encountered'}
+                        </p>
+                        <p className="text-sm opacity-80">{errorState}</p>
+                      </div>
+                    </motion.div>
+                  )}
+
                   {step === 1 && (
                     <motion.div
                       initial={{ opacity: 0 }}
@@ -253,7 +311,10 @@ const ReportIssue = () => {
                             className="w-full bg-slate-950/50 border border-white/10 rounded-[1.5rem] p-5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all resize-none placeholder:text-slate-600"
                             placeholder="Briefly, what is the problem?"
                             value={description}
-                            onChange={(e) => setDescription(e.target.value)}
+                            onChange={(e) => {
+                              setDescription(e.target.value);
+                              if (errorState) setErrorState(null);
+                            }}
                           />
                         </div>
                         
@@ -324,7 +385,10 @@ const ReportIssue = () => {
                                          step="any"
                                          className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm focus:ring-1 focus:ring-blue-500/50 outline-none"
                                          value={location.lat || ''}
-                                         onChange={(e) => setLocation({...location, lat: parseFloat(e.target.value)})}
+                                         onChange={(e) => {
+                                           setLocation({...location, lat: parseFloat(e.target.value)});
+                                           if (errorState) setErrorState(null);
+                                         }}
                                          placeholder="0.0000"
                                        />
                                      </div>
@@ -335,7 +399,10 @@ const ReportIssue = () => {
                                          step="any"
                                          className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm focus:ring-1 focus:ring-blue-500/50 outline-none"
                                          value={location.lng || ''}
-                                         onChange={(e) => setLocation({...location, lng: parseFloat(e.target.value)})}
+                                         onChange={(e) => {
+                                           setLocation({...location, lng: parseFloat(e.target.value)});
+                                           if (errorState) setErrorState(null);
+                                         }}
                                          placeholder="0.0000"
                                        />
                                      </div>
@@ -346,7 +413,10 @@ const ReportIssue = () => {
                                        type="text" 
                                        className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm focus:ring-1 focus:ring-blue-500/50 outline-none"
                                        value={location.label || ''}
-                                       onChange={(e) => setLocation({...location, label: e.target.value})}
+                                       onChange={(e) => {
+                                         setLocation({...location, label: e.target.value});
+                                         if (errorState) setErrorState(null);
+                                       }}
                                        placeholder="e.g. Main Street near Central Park"
                                      />
                                    </div>
@@ -371,7 +441,10 @@ const ReportIssue = () => {
 
                       <div className="flex gap-4 pt-4">
                         <button 
-                          onClick={() => setStep(1)}
+                          onClick={() => {
+                            setStep(1);
+                            setErrorState(null);
+                          }}
                           className="flex-1 py-4 glass text-white rounded-2xl font-bold hover:bg-white/5 transition-colors"
                         >
                           Back
@@ -395,18 +468,24 @@ const ReportIssue = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 className="text-center"
               >
-                <div className="w-24 h-24 bg-green-500/20 rounded-full flex items-center justify-center text-green-500 mx-auto mb-8 shadow-2xl shadow-green-500/20 relative">
-                  <CheckCircle2 className="w-12 h-12" />
+                <div className={`w-24 h-24 ${submissionStatus === 'duplicate' ? 'bg-red-500/20 text-red-500' : 'bg-green-500/20 text-green-500'} rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl relative`}>
+                  {submissionStatus === 'duplicate' ? <AlertCircle className="w-12 h-12" /> : <CheckCircle2 className="w-12 h-12" />}
                   <motion.div
                     animate={{ scale: [1, 1.5, 1], opacity: [0, 0.5, 0] }}
                     transition={{ duration: 2, repeat: Infinity }}
-                    className="absolute inset-0 border-4 border-green-500 rounded-full"
+                    className={`absolute inset-0 border-4 ${submissionStatus === 'duplicate' ? 'border-red-500' : 'border-green-500'} rounded-full`}
                   />
                 </div>
                 
-                <h2 className="text-3xl font-bold text-white mb-2">Issue Reported!</h2>
+                <h2 className="text-3xl font-bold text-white mb-2">
+                  {submissionStatus === 'duplicate' ? 'Duplicate Report' : 'Issue Reported!'}
+                </h2>
                 <p className="text-slate-400 mb-8 max-w-sm mx-auto">
-                  {aiResult ? "Gemini AI has completed the analysis and prioritized your request." : "Report received. AI analysis is currently in queue and will appear on the dashboard shortly."}
+                  {submissionStatus === 'matched'
+                    ? "This issue has already been reported by other citizens. Your report has been added to the case."
+                    : aiResult 
+                    ? "Gemini AI has completed the analysis and prioritized your request." 
+                    : "Report received. AI analysis is currently in queue and will appear on the dashboard shortly."}
                 </p>
 
                 {aiResult && (

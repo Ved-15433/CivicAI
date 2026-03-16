@@ -34,9 +34,8 @@ const Dashboard = () => {
       setLoading(true);
       try {
         const { data, error } = await supabase
-          .from('complaints')
+          .from('issues')
           .select('*, departments(name)')
-          .not('user_id', 'is', null)
           .order('priority_score', { ascending: false });
 
         if (error) throw error;
