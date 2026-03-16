@@ -74,14 +74,23 @@ const IssueList = React.memo(({ issues }) => {
                   {issue.ai_summary || issue.description}
                 </p>
                 
+                <div className="flex items-center gap-2 mb-4 bg-blue-500/5 px-3 py-2 rounded-2xl border border-blue-500/10 w-fit">
+                  <div className="flex -space-x-2">
+                    {Array.from({ length: Math.min(issue.unique_user_count || issue.report_count || 1, 3) }).map((_, i) => (
+                      <div key={i} className="w-6 h-6 rounded-full border-2 border-slate-900 bg-slate-800 flex items-center justify-center overflow-hidden">
+                        <Users className="w-3 h-3 text-blue-400" />
+                      </div>
+                    ))}
+                  </div>
+                  <span className="text-xs font-bold text-blue-400">
+                    {issue.unique_user_count || issue.report_count || 1} { (issue.unique_user_count || issue.report_count || 1) === 1 ? 'citizen' : 'citizens' } reported this
+                  </span>
+                </div>
+
                 <div className="flex flex-wrap gap-2 mb-4">
                   <div className="px-2 py-1 rounded-md bg-white/5 text-[10px] font-bold text-slate-400 uppercase tracking-tighter flex items-center gap-1.5">
                     <Shield className="w-3 h-3" />
                     {issue.category || 'Unclassified'}
-                  </div>
-                  <div className="px-2 py-1 rounded-md bg-blue-500/10 text-[10px] font-bold text-blue-400 uppercase tracking-tighter flex items-center gap-1.5">
-                    <Users className="w-3 h-3" />
-                    Reported by {issue.report_count || 1} citizens
                   </div>
                   {getStatusBadge(issue.status)}
                 </div>

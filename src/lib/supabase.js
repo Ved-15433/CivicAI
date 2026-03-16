@@ -1,6 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://ethoqrgqgjpgbwdfwizn.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0aG9xcmdxZ2pwZ2J3ZGZ3aXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1OTAzNDQsImV4cCI6MjA4OTE2NjM0NH0.s-x-YPq2Se4dYQDT27zcqiJXQZGCrL4lDykOJJY7XHQ';
+const supabaseAnonKey = 'sb_publishable_a_tW6zyqdcj9iU9CluACsQ_FZJCTatQ';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});

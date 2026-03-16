@@ -55,12 +55,10 @@ const IssueDetailModal = ({ issue, onClose }) => {
                 Case Report
               </span>
               <span className="text-slate-500 text-sm font-medium">#{issue.id.slice(0, 8)}</span>
-              {issue.report_count > 1 && (
-                <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest ml-auto">
-                   <Users className="w-3 h-3" />
-                   {issue.report_count} Citizens Reported
-                </div>
-              )}
+              <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest ml-auto">
+                 <Users className="w-3 h-3" />
+                 {issue.unique_user_count || issue.report_count || 1} { (issue.unique_user_count || issue.report_count || 1) === 1 ? 'Citizen' : 'Citizens' } Reported
+              </div>
             </div>
             <h2 className="text-3xl font-black text-white leading-tight mb-2">{issue.title}</h2>
             <div className="flex items-center gap-4 text-slate-500 text-sm">

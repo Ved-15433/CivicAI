@@ -67,10 +67,34 @@ const ReportIssue = () => {
   const handleSubmit = async () => {
     setLoading(true);
     try {
+      // 0. Verify Session before starting any work
+      console.log("[AUTH] Verifying session before starting submission...");
+      // getUser() is better than getSession() here because it validates the JWT with the server
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !authData.user) {
+        console.error("[AUTH ERROR] getUser failed:", authError);
+        const isJwtError = authError?.message?.toLowerCase().includes('jwt') || authError?.status === 401;
+        
+        if (isJwtError) {
+          setErrorState("Your session is invalid (Invalid JWT). Cleaning up session, please sign in again...");
+          setTimeout(async () => {
+            await supabase.auth.signOut();
+            window.location.href = '/login';
+          }, 3000);
+        } else {
+          setErrorState("You must be signed in to report an issue. Please sign in again.");
+        }
+        setLoading(false);
+        return;
+      }
+
+      const activeUser = authData.user;
+
       // 1. Upload Image to Supabase Storage
       let imageUrl = null;
       if (image) {
-        console.log(`[STORAGE] Uploading ${image.name}...`);
+        console.log(`[STORAGE] Uploading ${image.name} for user ${activeUser.id}...`);
         const fileExt = image.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
         const { error: uploadError, data } = await supabase.storage
@@ -79,26 +103,28 @@ const ReportIssue = () => {
         
         if (uploadError) {
           console.error("[STORAGE ERROR]", uploadError);
+          // Special handling for JWT errors in Storage
+          if (uploadError.message?.includes('JWT') || uploadError.status === 401) {
+             setErrorState("Authentication error (Invalid JWT) during upload. Redirecting to login...");
+             setTimeout(async () => {
+               await supabase.auth.signOut();
+               window.location.href = '/login';
+             }, 3000);
+          } else {
+             setErrorState(`Storage Error: ${uploadError.message}`);
+          }
           throw uploadError;
         }
         imageUrl = data.path;
         console.log(`[STORAGE] Upload success: ${imageUrl}`);
       }
 
-      // 2. Prepare Payload & Trigger AI Processing
-      console.log("[AUTH] Getting current user...");
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError) {
-        console.warn("[AUTH WARNING] getUser failed:", authError);
-        // We still proceed as anonymous if allowed, or we could stop here
-      }
-      const user = authData?.user;
-      
+      // 2. Trigger AI Processing
       setAiProcessing(true);
       
       try {
-        const finalUserId = (user?.id && user.id !== 'undefined') ? user.id : null;
-        console.log(`[SUBMIT] Invoking edge function. User: ${finalUserId || 'anonymous'}`);
+        const finalUserId = activeUser.id;
+        console.log(`[SUBMIT] Invoking edge function. User: ${finalUserId}`);
         
         const payload = { 
           user_id: finalUserId,
@@ -111,12 +137,21 @@ const ReportIssue = () => {
         };
         console.log("[SUBMIT] Payload:", JSON.stringify(payload, null, 2));
 
-        const { data: aiResponse, error: aiError } = await supabase.functions.invoke('process-complaint-v12-gemini-fix-v2', {
+        const { data: aiResponse, error: aiError } = await supabase.functions.invoke('process-complaint', {
           body: payload
         });
 
         if (aiError) {
           console.error("[INVOKE ERROR]", aiError);
+          // Check if function invocation returned a JWT error
+          if (aiError.message?.includes('JWT') || aiError.status === 401) {
+             setErrorState("Session expired (Invalid JWT). Please sign in again.");
+             setTimeout(() => {
+                supabase.auth.signOut();
+                window.location.href = '/login';
+             }, 2000);
+             return;
+          }
           throw aiError;
         }
 
@@ -482,7 +517,7 @@ const ReportIssue = () => {
                 </h2>
                 <p className="text-slate-400 mb-8 max-w-sm mx-auto">
                   {submissionStatus === 'matched'
-                    ? "This issue has already been reported by other citizens. Your report has been added to the case."
+                    ? "This issue has already been reported by other citizens. Your report has been added to the existing issue."
                     : aiResult 
                     ? "Gemini AI has completed the analysis and prioritized your request." 
                     : "Report received. AI analysis is currently in queue and will appear on the dashboard shortly."}

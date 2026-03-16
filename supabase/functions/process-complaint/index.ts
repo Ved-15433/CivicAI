@@ -31,6 +31,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  let reportId: string | null = null;
 
   try {
     const payload = await req.json();
@@ -44,21 +45,35 @@ Deno.serve(async (req: Request) => {
       location_label 
     } = payload;
 
-    // Sanitize user_id (common bug where "undefined" string is passed)
     if (user_id === "undefined" || !user_id) user_id = null;
 
-    console.log(`[PROCESS] New report request from user: ${user_id || 'anonymous'}`);
+    console.log(`[PROCESS] Starting processing for User: ${user_id || 'anonymous'}`);
+
+    // Create initial report row to track progress
+    const { data: initialReport, error: initErr } = await supabase.from("reports").insert({
+      title: inputTitle || "Civic Report",
+      description: description || "No description provided",
+      image_url: image_url,
+      user_id: user_id,
+      latitude: latitude,
+      longitude: longitude,
+      location_label: location_label,
+      analysis_status: "processing"
+    }).select().single();
+
+    if (initErr) throw new Error(`Failed to initialize report record: ${initErr.message}`);
+    reportId = initialReport.id;
+    console.log(`[PROCESS] Created initial report record: ${reportId}`);
 
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY environment variable is not set.");
 
     // 1. Initial AI Analysis & Visual Fingerprinting
-    // We do this BEFORE insertion so we can check for duplicates
     const analysisPrompt = `Act as a senior civic engineer. Analyze this complaint image and description.
     Category: Select from Roads, Sanitation, Water, Safety, Electricity, Parks.
     Stats: Provide 1-5 scores for severity, urgency, and public_impact.
     AI Summary: 1-sentence overview.
     Resolution Prediction: Estimated time to fix.
-    Visual Description: Provide a DETAILED visual fingerprint of the specific problem. Focus on unique identifiers (e.g., "Circular pothole about 2ft wide next to a blue storm drain cover", "Large pile of construction debris blocking exactly 40% of the sidewalk near a green fence"). 
+    Visual Description: Provide a DETAILED visual fingerprint of the specific problem. Focus on unique identifiers.
 
     Description: ${description || "No description provided."}
 
@@ -68,59 +83,62 @@ Deno.serve(async (req: Request) => {
     const parts = [{ text: analysisPrompt }];
     if (image_url) {
       try {
-        console.log(`[PROCESS] Fetching image from storage: ${image_url}`);
         const { data } = supabase.storage.from("complaint-images").getPublicUrl(image_url);
         const publicUrl = data?.publicUrl;
-        
         if (publicUrl) {
           const imgRes = await fetch(publicUrl);
           if (imgRes.ok) {
             const buf = await imgRes.arrayBuffer();
             const base64 = uint8ArrayToBase64(new Uint8Array(buf));
             parts.push({ inline_data: { mime_type: imgRes.headers.get("Content-Type") || "image/jpeg", data: base64 } } as any);
-            console.log(`[PROCESS] Image attached successfully. Size: ${buf.byteLength} bytes`);
-          } else {
-            console.warn(`[PROCESS] Image fetch failed with status: ${imgRes.status}`);
           }
         }
       } catch (imgErr: any) {
-        console.error(`[PROCESS] Non-fatal image error: ${imgErr.message}`);
+        console.warn(`[PROCESS] Non-fatal image fetch error: ${imgErr.message}`);
       }
     }
 
-    const gUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const modelName = "gemini-2.5-flash";
+    const gUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
+    
+    console.log(`[GEMINI] Requesting analysis from ${modelName}...`);
     const gRes = await fetch(gUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts }], generationConfig: { response_mime_type: "application/json", temperature: 0.1 } })
+      body: JSON.stringify({ 
+        contents: [{ parts }], 
+        generationConfig: { response_mime_type: "application/json", temperature: 0.1 } 
+      })
     });
 
-    if (!gRes.ok) throw new Error(`Gemini API Error (${gRes.status}): ${await gRes.text()}`);
+    if (!gRes.ok) {
+      const errText = await gRes.text();
+      console.error(`[GEMINI ERROR] ${gRes.status}: ${errText}`);
+      throw new Error(`Gemini API Error (${gRes.status}): ${errText}`);
+    }
+
     const gData = await gRes.json();
-    
-    if (!gData.candidates || gData.candidates.length === 0) {
-      console.error("[GEMINI ERROR] No candidates returned. Full response:", JSON.stringify(gData));
-      throw new Error("AI provider failed to generate a response. Please try again.");
+    if (!gData.candidates?.[0]?.content?.parts?.[0]?.text) {
+      throw new Error("Gemini returned empty response.");
     }
 
     const aiText = gData.candidates[0].content.parts[0].text;
-    console.log(`[PROCESS] Gemini response received. Length: ${aiText.length}`);
+    console.log(`[GEMINI] Raw Response: ${aiText.substring(0, 200)}...`);
 
     let aiData;
     try {
       aiData = JSON.parse(aiText.replace(/```json\n?/, "").replace(/\n?```/, "").trim());
     } catch (parseErr) {
-      console.error("[JSON ERROR] Failed to parse Gemini response:", aiText);
-      throw new Error("AI analysis returned invalid data format.");
+      console.error("[JSON ERROR] Parse failed:", aiText);
+      throw new Error("AI analysis returned invalid JSON format.");
     }
 
-    // Ensure numeric values
     aiData.severity = Number(aiData.severity) || 3;
     aiData.urgency = Number(aiData.urgency) || 3;
     aiData.public_impact = Number(aiData.public_impact) || 3;
 
-    // 2. Duplicate Detection via Spatial + Visual Similarity
-    console.log(`[PROCESS] Searching for nearby issues. Category: ${aiData.category}, Lat: ${latitude}, Lng: ${longitude}`);
+    // 2. Duplicate Detection
+    console.log(`[PROCESS] Running duplicate check for ${aiData.category}...`);
     const { data: candidates, error: rpcErr } = await supabase.rpc('get_nearby_issues', {
       lat: latitude,
       lng: longitude,
@@ -128,25 +146,12 @@ Deno.serve(async (req: Request) => {
       target_category: aiData.category
     });
 
-    if (rpcErr) {
-      console.error("[DB ERROR] RPC get_nearby_issues failed:", rpcErr);
-      // We don't throw here to allow report creation even if clustering fails, 
-      // but we log it. Actually, for robust clustering, we should probably know if it failed.
-    }
-
     let matchedIssueId = null;
-
     if (candidates && candidates.length > 0) {
-      console.log(`[PROCESS] Found ${candidates.length} nearby candidates. Prompting Gemini for match...`);
-      
-      const matchPrompt = `Compare this new report with existing issues in the same area. 
-      New Report Visual Description: ${aiData.visual_description || "No visual description provided."}
-      New Report Text: ${description || "No description provided."}
-
-      Existing Issues:
-      ${candidates.map((c: any, idx: number) => `${idx}. ${c.visual_description || "No description"}`).join('\n')}
-
-      Is it the SAME EXACT physical problem? Return ONLY the index number (0, 1, etc.) or "none" if no match.`;
+      const matchPrompt = `Is this new report the SAME EXACT physical problem as any existing ones?
+      New Report: ${aiData.visual_description}
+      Existing: ${candidates.map((c: any, i: number) => `${i}. ${c.visual_description}`).join('\n')}
+      Return ONLY the index number or "none".`;
 
       const mRes = await fetch(gUrl, {
         method: "POST",
@@ -156,62 +161,41 @@ Deno.serve(async (req: Request) => {
 
       if (mRes.ok) {
         const mData = await mRes.json();
-        console.log(`[PROCESS] Match Gemini response: ${JSON.stringify(mData).substring(0, 100)}`);
-        
-        if (mData.candidates && mData.candidates.length > 0 && mData.candidates[0].content) {
-          const matchText = mData.candidates[0].content.parts[0].text.trim().toLowerCase();
-          const matchIdx = parseInt(matchText);
-          
-          if (!isNaN(matchIdx) && candidates[matchIdx]) {
-            matchedIssueId = candidates[matchIdx].id;
-            console.log(`[PROCESS] Matched existing issue: ${matchedIssueId}`);
-            
-            // 3. Same-User Check (BEFORE INSERTION)
-            if (user_id) {
-              console.log(`[PROCESS] Checking if user ${user_id} already reported issue ${matchedIssueId}`);
-              const { data: existingUserReport, error: userReportErr } = await supabase
-                .from("reports")
-                .select("id, created_at")
-                .eq("issue_id", matchedIssueId)
-                .eq("user_id", user_id)
-                .maybeSingle(); // maybeSingle is safer here than limit(1).order() for simple check
+        const matchText = mData.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toLowerCase();
+        const matchIdx = parseInt(matchText);
+        if (!isNaN(matchIdx) && candidates[matchIdx]) {
+          matchedIssueId = candidates[matchIdx].id;
+          console.log(`[PROCESS] Found match: ${matchedIssueId}`);
 
-              if (userReportErr) {
-                console.error("[DB ERROR] Same-user check failed:", userReportErr);
-              }
+          // Same-User Check
+          if (user_id) {
+            const { data: duplicateUserReport } = await supabase
+              .from("reports")
+              .select("id")
+              .eq("issue_id", matchedIssueId)
+              .eq("user_id", user_id)
+              .maybeSingle();
 
-              if (existingUserReport) {
-                console.log(`[PROCESS] Duplicate detected for user ${user_id}. Blocking insertion.`);
-                const date = new Date(existingUserReport.created_at).toLocaleDateString();
-                return new Response(JSON.stringify({ 
-                  success: false, 
-                  status: "duplicate_user", 
-                  error: `Complaint already submitted. You already reported this issue on ${date}.`,
-                  existing_report_id: existingUserReport.id
-                }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-              }
+            if (duplicateUserReport) {
+              console.log("[PROCESS] User already reported this issue. Blocking.");
+              await supabase.from("reports").delete().eq("id", reportId!);
+              return new Response(JSON.stringify({ 
+                success: false, 
+                status: "duplicate_user", 
+                error: "You have already reported this issue." 
+              }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
-          } else {
-            console.log(`[PROCESS] No visual match found according to Gemini (returned: ${matchText})`);
           }
         }
-      } else {
-        console.error(`[AI ERROR] Match Gemini call failed with status ${mRes.status}`);
       }
-    } else {
-      console.log(`[PROCESS] No candidates found within radius.`);
     }
 
-    // 4. Create or Update Issue
-    console.log(`[PROCESS] Proceeding with issue stage. Matched issue ID: ${matchedIssueId}`);
-    
-    // Sanitize matchedIssueId
-    if (matchedIssueId === "undefined") matchedIssueId = null;
-    
+    // 3. Issue and Report Update
     let finalIssueId = matchedIssueId;
-    let duplicateStatus = matchedIssueId ? "matched" : "new";
+    let status = matchedIssueId ? "matched" : "new";
 
     if (!finalIssueId) {
+      console.log("[PROCESS] Creating new master issue.");
       const score = (aiData.severity * 0.35) + (aiData.urgency * 0.35) + (aiData.public_impact * 0.2) + (Math.log10(1 + 1) * 0.1);
       const { data: newIssue, error: iErr } = await supabase.from("issues").insert({
         title: inputTitle || aiData.ai_summary.substring(0, 50),
@@ -221,85 +205,61 @@ Deno.serve(async (req: Request) => {
         public_impact: aiData.public_impact,
         priority_score: score,
         report_count: 1,
+        unique_user_count: 1,
         latitude: latitude,
         longitude: longitude,
         location_label: location_label,
         ai_summary: aiData.ai_summary,
         status: "pending",
         image_url: image_url,
-        department_id: DEPT_MAPPING[aiData.category] || DEPT_MAPPING[Object.keys(DEPT_MAPPING).find(k => aiData.category?.includes(k)) || "Roads"],
+        department_id: DEPT_MAPPING[aiData.category] || DEPT_MAPPING["Roads"],
         visual_description: aiData.visual_description
       }).select().single();
       
-      if (iErr) {
-        console.error("[DB ERROR] Issue creation failed:", iErr);
-        throw new Error(`Failed to create issue: ${iErr.message}`);
-      }
+      if (iErr) throw iErr;
       finalIssueId = newIssue.id;
-      console.log(`[PROCESS] Created new issue: ${finalIssueId}`);
     } else {
-      // Update existing issue
-      console.log(`[PROCESS] Updating existing issue: ${finalIssueId}`);
-      const { data: issue, error: issueFetchErr } = await supabase.from("issues").select("*").eq("id", finalIssueId).single();
+      console.log("[PROCESS] Merging into existing issue.");
+      const { data: issue } = await supabase.from("issues").select("*").eq("id", finalIssueId).single();
+      const newUniqueCount = (issue.unique_user_count || 1) + 1;
+      const score = (issue.severity * 0.35) + (issue.urgency * 0.35) + (issue.public_impact * 0.2) + (Math.log10(newUniqueCount + 1) * 0.1);
       
-      if (issueFetchErr || !issue) {
-        console.error("[DB ERROR] Issue fetch failed for update:", issueFetchErr);
-        throw new Error("Target issue not found for update.");
-      }
-
-      const newCount = (issue.report_count || 0) + 1;
-      const score = (issue.severity * 0.35) + (issue.urgency * 0.35) + (issue.public_impact * 0.2) + (Math.log10(newCount + 1) * 0.1);
-      
-      const { error: issueUpdateErr } = await supabase.from("issues").update({
-        report_count: newCount,
+      await supabase.from("issues").update({
+        report_count: (issue.report_count || 0) + 1,
+        unique_user_count: newUniqueCount,
         priority_score: score,
         last_report_at: new Date().toISOString()
       }).eq("id", finalIssueId);
-
-      if (issueUpdateErr) {
-        console.error("[DB ERROR] Issue update failed:", issueUpdateErr);
-        throw new Error(`Failed to update issue: ${issueUpdateErr.message}`);
-      }
     }
 
-    // 5. Final Insertion of Report
-    console.log(`[PROCESS] Inserting report for issue: ${finalIssueId}`);
-    const { data: finalReport, error: reportErr } = await supabase.from("reports").insert({
-      title: inputTitle || aiData.ai_summary?.substring(0, 50) || "Civic Report",
-      description: description || "No description provided",
-      image_url: image_url,
-      user_id: user_id,
+    // Finalize the report
+    console.log(`[PROCESS] Completing report record ${reportId}...`);
+    const { error: finalUpdErr } = await supabase.from("reports").update({
       issue_id: finalIssueId,
-      latitude: latitude,
-      longitude: longitude,
-      location_label: location_label,
-      analysis_status: "completed"
-    }).select().single();
+      analysis_status: "completed",
+      title: inputTitle || aiData.ai_summary?.substring(0, 50) || "Civic Report"
+    }).eq("id", reportId!);
 
-    if (reportErr) throw reportErr;
+    if (finalUpdErr) console.error("[DB ERROR] Final update failed:", finalUpdErr);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      status: duplicateStatus, 
-      data: { 
-        ...aiData, 
-        issue_id: finalIssueId, 
-        report_id: finalReport.id,
-        summary: aiData.ai_summary // ensure summary is returned as frontend expects
-      } 
+      status, 
+      data: { ...aiData, issue_id: finalIssueId, report_id: reportId, summary: aiData.ai_summary } 
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (e: any) {
-    const errorStack = e instanceof Error ? e.stack : "No stack trace";
-    console.error(`[CRITICAL ERROR]: ${e.message}\nStack: ${errorStack}`);
+    console.error(`[CRITICAL ERROR] ${e.message}`);
+    if (reportId) {
+      await supabase.from("reports").update({
+        analysis_status: "failed",
+        error_message: e.message
+      }).eq("id", reportId);
+      console.log(`[DB] Updated report ${reportId} to failed status.`);
+    }
     
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: e.message,
-      status: "error",
-      details: errorStack 
-    }), { 
-      status: 500, 
+    return new Response(JSON.stringify({ success: false, error: e.message, status: "error" }), { 
+      status: 200, // Return 200 so frontend can handle custom error state
       headers: { ...corsHeaders, "Content-Type": "application/json" } 
     });
   }

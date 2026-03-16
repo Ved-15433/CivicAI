@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, Clock, CheckCircle2, FileText } from 'lucide-react';
+import { AlertCircle, Clock, CheckCircle2, FileText, Users } from 'lucide-react';
 
 const StatsCards = ({ stats }) => {
   const cards = [
@@ -26,11 +26,11 @@ const StatsCards = ({ stats }) => {
       description: 'Waiting for AI/Admin review'
     },
     { 
-      label: 'Resolved', 
-      value: stats.resolved, 
-      icon: CheckCircle2, 
-      color: 'green',
-      description: 'Successfully addressed'
+      label: 'Citizens Engaged', 
+      value: stats.citizens, 
+      icon: Users, 
+      color: 'indigo',
+      description: 'Unique users helping the city'
     },
   ];
 
@@ -40,6 +40,7 @@ const StatsCards = ({ stats }) => {
       red: 'text-red-400 bg-red-500/10 border-red-500/20',
       amber: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
       green: 'text-green-400 bg-green-500/10 border-green-500/20',
+      indigo: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
     };
     return mapping[color];
   };

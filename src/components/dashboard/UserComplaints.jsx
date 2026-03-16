@@ -11,7 +11,8 @@ import {
   XCircle,
   Loader2,
   Brain,
-  MapPin
+  MapPin,
+  Users
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -220,13 +221,16 @@ const UserComplaints = React.memo(({ userId }) => {
                         </span>
                       </div>
                     )}
-                    {issue.issues?.report_count > 1 && (
-                      <div className="flex items-center gap-1.5 text-indigo-400">
-                        <Users className="w-3 h-3" />
-                        <span className="text-xs font-black uppercase tracking-tighter">
-                          {issue.issues.report_count} Reports
-                        </span>
-                      </div>
+                    <div className="flex items-center gap-1.5 text-indigo-400 bg-indigo-500/5 px-2 py-0.5 rounded-lg border border-indigo-500/10">
+                      <Users className="w-3 h-3" />
+                      <span className="text-[10px] font-black uppercase tracking-tighter">
+                        {issue.issues?.unique_user_count || 1} { (issue.issues?.unique_user_count || 1) === 1 ? 'citizen' : 'citizens' }
+                      </span>
+                    </div>
+                    {issue.issues?.unique_user_count > 1 && (
+                      <span className="text-[10px] font-bold text-slate-500 italic">
+                        (Merged into existing issue)
+                      </span>
                     )}
                   </div>
                 </div>

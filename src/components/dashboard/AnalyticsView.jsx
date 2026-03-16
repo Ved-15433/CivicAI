@@ -9,8 +9,8 @@ const AnalyticsView = React.memo(({ complaints, loading }) => {
     const total = complaints.length;
     const critical = complaints.filter(c => c.severity >= 4).length;
     const pending = complaints.filter(c => c.status === 'pending').length;
-    const resolved = complaints.filter(c => c.status === 'resolved').length;
-    return { total, critical, pending, resolved };
+    const citizens = complaints.reduce((sum, c) => sum + (c.unique_user_count || 1), 0);
+    return { total, critical, pending, citizens };
   }, [complaints]);
 
   const chartData = useMemo(() => {
