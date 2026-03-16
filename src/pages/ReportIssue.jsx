@@ -120,26 +120,25 @@ const ReportIssue = () => {
       // IMPROVED ERROR HANDLING
       if (aiError) {
         console.error("Edge Function Invoke Error:", aiError);
-        
-        // Try to extract the real error message if it's a response error
         let errorMessage = "AI processing failed. Please try again.";
-        
         if (aiError.context?.json) {
            errorMessage = aiError.context.json.error || errorMessage;
         } else if (aiError.message) {
            errorMessage = aiError.message;
         }
-        
         setErrorState(errorMessage);
         setAiProcessing(false);
         setLoading(false);
         return;
       }
 
-      if (aiResponse?.success === false) {
-        setErrorState(aiResponse.error || "AI Analysis failed to process this report.");
+      // PRIORITIZE STATUS CHECKS
+      if (aiResponse?.status === 'duplicate_user' || aiResponse?.status === 'duplicate') {
+        setSubmissionStatus('duplicate');
+        setErrorState(null); // Clear error since we're showing the success screen for duplicates
         setAiProcessing(false);
         setLoading(false);
+        setSubmitted(true);
         return;
       }
 
@@ -150,9 +149,8 @@ const ReportIssue = () => {
         return;
       }
 
-      if (aiResponse?.status === 'duplicate_user') {
-        setSubmissionStatus('duplicate');
-        setErrorState(aiResponse.error || "You have already submitted a report for this issue.");
+      if (aiResponse?.success === false) {
+        setErrorState(aiResponse.error || "AI Analysis failed to process this report.");
         setAiProcessing(false);
         setLoading(false);
         return;
@@ -478,7 +476,9 @@ const ReportIssue = () => {
                   {submissionStatus === 'duplicate' ? 'Duplicate Report' : 'Issue Reported!'}
                 </h2>
                 <p className="text-slate-400 mb-8 max-w-sm mx-auto">
-                  {submissionStatus === 'matched'
+                  {submissionStatus === 'duplicate'
+                    ? "Complaint already submitted. You have already reported this exact issue at this location."
+                    : submissionStatus === 'matched'
                     ? "This issue has already been reported by other citizens. Your report has been added to the existing issue."
                     : aiResult 
                     ? "Gemini AI has completed the analysis and prioritized your request." 
