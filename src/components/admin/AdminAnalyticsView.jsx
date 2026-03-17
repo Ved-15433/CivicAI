@@ -18,38 +18,69 @@ const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
 
   const chartData = useMemo(() => {
     if (!complaints || complaints.length === 0) {
-      return { departmentData: [], statusData: [], timelineData: [] };
+      return { departmentData: [], categoryData: [], statusData: [], timelineData: [], severityData: [] };
     }
 
-    // Complaints by Department
-    const deptMap = {};
-    complaints.forEach(c => {
-      const dept = c.departments?.name || 'Others';
-      deptMap[dept] = (deptMap[dept] || 0) + 1;
-    });
-    const departmentData = Object.entries(deptMap)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
+    const DEPARTMENTS = [
+      'Drainage & Flooding',
+      'Waste & Sanitation',
+      'Roads & Bridges',
+      'Water Supply',
+      'Electricity',
+      'Others'
+    ];
 
-    // Complaints by Status
-    const statusMap = {
-      'pending': 0,
-      'approved': 0,
-      'in-progress': 0,
-      'resolved': 0,
-      'rejected': 0
+    const normalizeDepartment = (issue) => {
+      const category = (issue.category || '').toLowerCase();
+      const deptName = (issue.departments?.name || '').toLowerCase();
+      const combined = `${category} ${deptName}`;
+
+      if (combined.includes('drainage') || combined.includes('flood')) return 'Drainage & Flooding';
+      if (combined.includes('waste') || combined.includes('sanitation') || combined.includes('sewage') || combined.includes('garbage') || combined.includes('trash')) return 'Waste & Sanitation';
+      if (combined.includes('road') || combined.includes('bridge') || combined.includes('pothole') || combined.includes('street')) return 'Roads & Bridges';
+      if (combined.includes('water supply') || combined.includes('water leak') || (combined.includes('water') && !combined.includes('waste'))) return 'Water Supply';
+      if (combined.includes('electr') || combined.includes('power') || combined.includes('light')) return 'Electricity';
+      
+      return 'Others';
     };
+
+    // 1. Issues per Department (Normalized)
+    const deptMap = {};
+    DEPARTMENTS.forEach(d => deptMap[d] = 0);
     complaints.forEach(c => {
-      if (statusMap.hasOwnProperty(c.status)) {
-        statusMap[c.status]++;
+      const dept = normalizeDepartment(c);
+      deptMap[dept]++;
+    });
+    const departmentData = Object.entries(deptMap).map(([name, value]) => ({ name, value }));
+
+    // 2. Issues by Category (Raw but cleaned)
+    const categoryMap = {};
+    complaints.forEach(c => {
+      let cat = c.category || c.departments?.name || 'Others';
+      // Basic cleaning: capitalize first letters
+      cat = cat.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      categoryMap[cat] = (categoryMap[cat] || 0) + 1;
+    });
+    const categoryData = Object.entries(categoryMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6); // Top 6 categories
+
+    // 3. Severity Distribution (Real 1-5 data)
+    const severityMap = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    complaints.forEach(c => {
+      const sev = Math.round(c.severity || 1);
+      if (severityMap.hasOwnProperty(sev)) {
+        severityMap[sev]++;
       }
     });
-    const statusData = Object.entries(statusMap).map(([name, value]) => ({ 
-      name: name.charAt(0).toUpperCase() + name.slice(1).replace('-', ' '), 
-      value 
+    const severityData = Object.entries(severityMap).map(([name, value]) => ({ 
+      name: `Lvl ${name}`, 
+      value,
+      level: parseInt(name)
     }));
 
-    // Timeline Data
+    // 4. Reporting Volume (Timeline)
     const timelineMap = {};
     const sortedComplaints = [...complaints].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     sortedComplaints.forEach(c => {
@@ -58,7 +89,7 @@ const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
     });
     const timelineData = Object.entries(timelineMap).map(([name, value]) => ({ name, value }));
 
-    return { departmentData, statusData, timelineData };
+    return { departmentData, categoryData, severityData, timelineData };
   }, [complaints]);
 
   if (loading && complaints.length === 0) {
@@ -112,8 +143,9 @@ const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
           <h3 className="text-xl font-black text-white uppercase tracking-tight">System Distribution</h3>
         </div>
         <IssueCharts 
-          categoryData={chartData.departmentData} 
-          severityData={chartData.statusData} 
+          departmentData={chartData.departmentData}
+          categoryData={chartData.categoryData} 
+          severityData={chartData.severityData} 
           timelineData={chartData.timelineData} 
         />
       </section>

@@ -6,7 +6,7 @@ import {
   LineChart, Line
 } from 'recharts';
 
-const IssueCharts = React.memo(({ categoryData, severityData, timelineData }) => {
+const IssueCharts = React.memo(({ departmentData, categoryData, severityData, timelineData }) => {
   const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1'];
 
   const CustomTooltip = ({ active, payload, label }) => {
@@ -22,8 +22,35 @@ const IssueCharts = React.memo(({ categoryData, severityData, timelineData }) =>
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-      {/* Category Pie Chart */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      {/* 1. Issues per Department (Bar Chart) */}
+      <div className="p-6 rounded-3xl glass border border-white/10 bg-slate-900/40">
+        <h4 className="text-slate-300 text-xs font-black uppercase tracking-[0.2em] mb-6">Issues per Department</h4>
+        <div className="h-[250px] w-full">
+           <ResponsiveContainer width="100%" height="100%">
+             <BarChart data={departmentData} layout="vertical">
+               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.05)" />
+               <XAxis type="number" hide />
+               <YAxis 
+                dataKey="name" 
+                type="category"
+                axisLine={false} 
+                tickLine={false} 
+                width={120}
+                tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
+              />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
+              <Bar dataKey="value" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                {departmentData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* 2. Issues by Category (Pie Chart) */}
       <div className="p-6 rounded-3xl glass border border-white/10 bg-slate-900/40">
         <h4 className="text-slate-300 text-xs font-black uppercase tracking-[0.2em] mb-6">Issues by Category</h4>
         <div className="h-[250px] w-full">
@@ -57,7 +84,7 @@ const IssueCharts = React.memo(({ categoryData, severityData, timelineData }) =>
         </div>
       </div>
 
-      {/* Severity Bar Chart */}
+      {/* 3. Severity Distribution (Bar Chart) */}
       <div className="p-6 rounded-3xl glass border border-white/10 bg-slate-900/40">
         <h4 className="text-slate-300 text-xs font-black uppercase tracking-[0.2em] mb-6">Severity Distribution</h4>
         <div className="h-[250px] w-full">
@@ -80,7 +107,7 @@ const IssueCharts = React.memo(({ categoryData, severityData, timelineData }) =>
                 {severityData.map((entry, index) => (
                   <Cell 
                     key={`cell-${index}`} 
-                    fill={entry.name >= 4 ? '#ef4444' : entry.name >= 3 ? '#f59e0b' : '#3b82f6'} 
+                    fill={entry.level >= 4 ? '#ef4444' : entry.level >= 3 ? '#f59e0b' : '#3b82f6'} 
                   />
                 ))}
               </Bar>
@@ -89,7 +116,7 @@ const IssueCharts = React.memo(({ categoryData, severityData, timelineData }) =>
         </div>
       </div>
 
-      {/* Timeline Line Chart */}
+      {/* 4. Reporting Volume (Line Chart) */}
       <div className="p-6 rounded-3xl glass border border-white/10 bg-slate-900/40">
         <h4 className="text-slate-300 text-xs font-black uppercase tracking-[0.2em] mb-6">Reporting Volume</h4>
         <div className="h-[250px] w-full">
