@@ -1,8 +1,21 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import StatsCards from '../dashboard/StatsCards';
 import IssueCharts from '../dashboard/IssueCharts';
-import { BarChart3, PieChart, Activity, CheckCircle2 } from 'lucide-react';
+import { BarChart3, Activity, CheckCircle2 } from 'lucide-react';
+
+const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1'];
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900/90 backdrop-blur-md border border-white/10 p-3 rounded-xl shadow-2xl">
+        <p className="text-white text-xs font-bold mb-1 uppercase tracking-widest">{label || payload[0].name}</p>
+        <p className="text-blue-400 font-bold text-lg">{payload[0].value} <span className="text-[10px] text-slate-500">issues</span></p>
+      </div>
+    );
+  }
+  return null;
+};
 
 const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
   const stats = useMemo(() => {

@@ -6,11 +6,8 @@ import {
   LayoutList, 
   UserCircle, 
   LogOut, 
-  Shield, 
-  Home,
   ChevronRight
 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
 import { useIssues } from '../../context/IssueContext';
 
 const Sidebar = React.memo(({ user, isAdmin }) => {

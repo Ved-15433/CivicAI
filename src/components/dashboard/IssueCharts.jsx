@@ -6,20 +6,21 @@ import {
   LineChart, Line
 } from 'recharts';
 
-const IssueCharts = React.memo(({ departmentData, categoryData, severityData, timelineData }) => {
-  const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1'];
+const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1'];
 
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-slate-900/90 backdrop-blur-md border border-white/10 p-3 rounded-xl shadow-2xl">
-          <p className="text-white text-xs font-bold mb-1 uppercase tracking-widest">{label || payload[0].name}</p>
-          <p className="text-blue-400 font-bold text-lg">{payload[0].value} <span className="text-[10px] text-slate-500">issues</span></p>
-        </div>
-      );
-    }
-    return null;
-  };
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900/90 backdrop-blur-md border border-white/10 p-3 rounded-xl shadow-2xl">
+        <p className="text-white text-xs font-bold mb-1 uppercase tracking-widest">{label || payload[0].name}</p>
+        <p className="text-blue-400 font-bold text-lg">{payload[0].value} <span className="text-[10px] text-slate-500">issues</span></p>
+      </div>
+    );
+  }
+  return null;
+};
+
+const IssueCharts = React.memo(({ departmentData = [], categoryData = [], severityData = [], timelineData = [] }) => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -39,7 +40,7 @@ const IssueCharts = React.memo(({ departmentData, categoryData, severityData, ti
                 width={120}
                 tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
               />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
+              <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
               <Bar dataKey="value" radius={[0, 4, 4, 0]} isAnimationActive={false}>
                 {departmentData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -70,7 +71,7 @@ const IssueCharts = React.memo(({ departmentData, categoryData, severityData, ti
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={CustomTooltip} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -102,7 +103,7 @@ const IssueCharts = React.memo(({ departmentData, categoryData, severityData, ti
                 tickLine={false} 
                 tick={{ fill: '#64748b', fontSize: 10 }}
               />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
+              <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
               <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive={false}>
                 {severityData.map((entry, index) => (
                   <Cell 
@@ -134,7 +135,7 @@ const IssueCharts = React.memo(({ departmentData, categoryData, severityData, ti
                 tickLine={false} 
                 tick={{ fill: '#64748b', fontSize: 10 }}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={CustomTooltip} />
                <Line 
                 type="monotone" 
                 dataKey="value" 

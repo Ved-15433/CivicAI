@@ -17,33 +17,75 @@ const AnalyticsView = React.memo(({ complaints, loading }) => {
 
   const chartData = useMemo(() => {
     if (!complaints || complaints.length === 0) {
-      return { categoryData: [], severityData: [], timelineData: [] };
+      return { departmentData: [], categoryData: [], severityData: [], timelineData: [] };
     }
 
-    const catMap = {};
-    complaints.forEach(c => {
-      const cat = c.category || 'Unassigned';
-      catMap[cat] = (catMap[cat] || 0) + 1;
-    });
-    const categoryData = Object.entries(catMap)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
+    const DEPARTMENTS = [
+      'Drainage & Flooding',
+      'Waste & Sanitation',
+      'Roads & Bridges',
+      'Water Supply',
+      'Electricity',
+      'Others'
+    ];
 
+    const normalizeDepartment = (issue) => {
+      const category = (issue.category || '').toLowerCase();
+      const deptName = (issue.departments?.name || '').toLowerCase();
+      const combined = `${category} ${deptName}`;
+
+      if (combined.includes('drainage') || combined.includes('flood')) return 'Drainage & Flooding';
+      if (combined.includes('waste') || combined.includes('sanitation') || combined.includes('sewage') || combined.includes('garbage') || combined.includes('trash')) return 'Waste & Sanitation';
+      if (combined.includes('road') || combined.includes('bridge') || combined.includes('pothole') || combined.includes('street')) return 'Roads & Bridges';
+      if (combined.includes('water supply') || combined.includes('water leak') || (combined.includes('water') && !combined.includes('waste'))) return 'Water Supply';
+      if (combined.includes('electr') || combined.includes('power') || combined.includes('light')) return 'Electricity';
+      
+      return 'Others';
+    };
+
+    // 1. Issues per Department (Normalized)
+    const deptMap = {};
+    DEPARTMENTS.forEach(d => deptMap[d] = 0);
+    complaints.forEach(c => {
+      const dept = normalizeDepartment(c);
+      deptMap[dept]++;
+    });
+    const departmentData = Object.entries(deptMap).map(([name, value]) => ({ name, value }));
+
+    // 2. Issues by Category (Raw but cleaned)
+    const categoryMap = {};
+    complaints.forEach(c => {
+      let cat = c.category || c.departments?.name || 'Others';
+      cat = cat.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      categoryMap[cat] = (categoryMap[cat] || 0) + 1;
+    });
+    const categoryData = Object.entries(categoryMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+
+    // 3. Severity Distribution
     const severityMap = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     complaints.forEach(c => {
-      if (c.severity) severityMap[c.severity]++;
+      const sev = Math.round(c.severity || 1);
+      if (severityMap.hasOwnProperty(sev)) severityMap[sev]++;
     });
-    const severityData = Object.entries(severityMap).map(([name, value]) => ({ name: parseInt(name), value }));
+    const severityData = Object.entries(severityMap).map(([name, value]) => ({ 
+      name: `Lvl ${name}`, 
+      value,
+      level: parseInt(name)
+    }));
 
+    // 4. Timeline Data
     const timelineMap = {};
-    // Extract last 10 unique dates to keep chart performant
-    complaints.slice(0, 50).forEach(c => {
+    const sortedComplaints = [...complaints].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    sortedComplaints.slice(-50).forEach(c => {
       const date = new Date(c.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
       timelineMap[date] = (timelineMap[date] || 0) + 1;
     });
-    const timelineData = Object.entries(timelineMap).map(([name, value]) => ({ name, value })).reverse();
+    const timelineData = Object.entries(timelineMap).map(([name, value]) => ({ name, value }));
 
-    return { categoryData, severityData, timelineData };
+    return { departmentData, categoryData, severityData, timelineData };
   }, [complaints]);
 
   if (loading && complaints.length === 0) {
