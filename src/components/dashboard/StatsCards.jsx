@@ -1,9 +1,17 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { AlertCircle, Clock, CheckCircle2, FileText, Users } from 'lucide-react';
 
+const COLOR_MAPPING = {
+  blue: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  red: 'text-red-400 bg-red-500/10 border-red-500/20',
+  amber: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  green: 'text-green-400 bg-green-500/10 border-green-500/20',
+  indigo: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
+};
+
 const StatsCards = React.memo(({ stats }) => {
-  const cards = [
+  const cards = useMemo(() => [
     { 
       label: 'Total Reports', 
       value: stats.total, 
@@ -32,18 +40,9 @@ const StatsCards = React.memo(({ stats }) => {
       color: 'indigo',
       description: 'Unique users helping the city'
     },
-  ];
+  ], [stats]);
 
-  const getColorClasses = (color) => {
-    const mapping = {
-      blue: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
-      red: 'text-red-400 bg-red-500/10 border-red-500/20',
-      amber: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-      green: 'text-green-400 bg-green-500/10 border-green-500/20',
-      indigo: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
-    };
-    return mapping[color];
-  };
+  const getColorClasses = (color) => COLOR_MAPPING[color] || '';
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 
 const IssueContext = createContext();
@@ -242,21 +242,44 @@ export const IssueProvider = ({ children }) => {
     }
   }, []);
 
-  const value = {
+  const isAdmin = useMemo(() => 
+    profile?.role === 'admin' || localStorage.getItem('isAdmin') === 'true', 
+  [profile]);
+
+  const handleSignOut = useCallback(async () => {
+    localStorage.removeItem('isAdmin');
+    await signOut();
+  }, [signOut]);
+
+  const refreshData = useCallback(() => fetchGlobalData(true), [fetchGlobalData]);
+  
+  const refreshUserReports = useCallback(() => {
+    if (user) fetchUserReports(user.id);
+  }, [user, fetchUserReports]);
+
+  const value = useMemo(() => ({
     user,
     profile,
-    isAdmin: profile?.role === 'admin' || localStorage.getItem('isAdmin') === 'true',
+    isAdmin,
     complaints,
     userReports,
     loading,
     userReportsLoading,
-    signOut: async () => {
-      localStorage.removeItem('isAdmin');
-      await signOut();
-    },
-    refreshData: () => fetchGlobalData(true),
-    refreshUserReports: () => user && fetchUserReports(user.id)
-  };
+    signOut: handleSignOut,
+    refreshData,
+    refreshUserReports
+  }), [
+    user, 
+    profile, 
+    isAdmin, 
+    complaints, 
+    userReports, 
+    loading, 
+    userReportsLoading, 
+    handleSignOut, 
+    refreshData, 
+    refreshUserReports
+  ]);
 
   return <IssueContext.Provider value={value}>{children}</IssueContext.Provider>;
 };

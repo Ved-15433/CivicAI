@@ -45,22 +45,18 @@ const UserComplaints = React.memo(({ userId }) => {
     }
   };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'processing': return <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />;
-      case 'completed': return <CheckCircle2 className="w-4 h-4 text-green-400" />;
-      case 'failed': return <XCircle className="w-4 h-4 text-red-400" />;
-      default: return <Clock className="w-4 h-4 text-slate-500" />;
-    }
+  const statusIcons = {
+    processing: <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />,
+    completed: <CheckCircle2 className="w-4 h-4 text-green-400" />,
+    failed: <XCircle className="w-4 h-4 text-red-400" />,
+    pending: <Clock className="w-4 h-4 text-slate-500" />
   };
 
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case 'processing': return 'Analyzing...';
-      case 'completed': return 'Analysis Done';
-      case 'failed': return 'Analysis Failed';
-      default: return 'In Queue';
-    }
+  const statusLabels = {
+    processing: 'Analyzing...',
+    completed: 'Analysis Done',
+    failed: 'Analysis Failed',
+    pending: 'In Queue'
   };
 
   if (loading && complaints.length === 0) {
@@ -113,11 +109,10 @@ const UserComplaints = React.memo(({ userId }) => {
               {complaints.map((issue) => (
                 <motion.div
                   key={issue.id}
-                  layout
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="group relative bg-slate-900/40 border border-white/5 rounded-3xl p-6 hover:bg-white/5 hover:border-white/10 transition-all flex flex-col md:flex-row items-center gap-6"
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  className="group relative bg-slate-900/60 border border-white/5 rounded-3xl p-6 hover:bg-slate-800/80 hover:border-blue-500/30 transition-all flex flex-col md:flex-row items-center gap-6"
                 >
                   {/* Thumbnail */}
                   <div className="w-full md:w-24 h-24 rounded-2xl bg-slate-950 overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => setSelectedIssue(issue.issues || issue)}>
@@ -161,9 +156,9 @@ const UserComplaints = React.memo(({ userId }) => {
                     </h4>
                     <div className="flex items-center gap-4 mt-2">
                       <div className="flex items-center gap-1.5">
-                        {getStatusIcon(issue.issues?.analysis_status || issue.analysis_status)}
+                        {statusIcons[issue.issues?.analysis_status || issue.analysis_status] || statusIcons.pending}
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                          {getStatusLabel(issue.issues?.analysis_status || issue.analysis_status)}
+                          {statusLabels[issue.issues?.analysis_status || issue.analysis_status] || statusLabels.pending}
                         </span>
                       </div>
                       {(issue.issues?.priority_score || issue.priority_score) && (

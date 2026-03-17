@@ -6,7 +6,7 @@ import IssueDetailModal from './IssueDetailModal';
 const IssueList = React.memo(({ issues, isAdmin }) => {
   const [selectedIssue, setSelectedIssue] = useState(null);
 
-  const getSeverityColor = (severity) => {
+  const getSeverityStyle = (severity) => {
     if (severity >= 5) return 'text-red-400 bg-red-500/10 border-red-500/20';
     if (severity >= 4) return 'text-orange-400 bg-orange-500/10 border-orange-500/20';
     if (severity >= 3) return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
@@ -14,18 +14,11 @@ const IssueList = React.memo(({ issues, isAdmin }) => {
     return 'text-green-400 bg-green-500/10 border-green-500/20';
   };
 
-  const getStatusBadge = (status) => {
-    const styles = {
-      pending: 'bg-slate-800 text-slate-400',
-      'in-progress': 'bg-blue-500/20 text-blue-400',
-      resolved: 'bg-green-500/20 text-green-400',
-      rejected: 'bg-red-500/20 text-red-400',
-    };
-    return (
-      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter ${styles[status]}`}>
-        {status.replace('_', ' ')}
-      </span>
-    );
+  const statusStyles = {
+    pending: 'bg-slate-800 text-slate-400',
+    'in-progress': 'bg-blue-500/20 text-blue-400',
+    resolved: 'bg-green-500/20 text-green-400',
+    rejected: 'bg-red-500/20 text-red-400',
   };
 
   if (issues.length === 0) {
@@ -43,19 +36,19 @@ const IssueList = React.memo(({ issues, isAdmin }) => {
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <AnimatePresence mode="popLayout">
-          {issues.map((issue, index) => (
+        <AnimatePresence mode="popLayout" initial={false}>
+          {issues.map((issue) => (
             <motion.div
               key={issue.id}
-              layout
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
               onClick={() => setSelectedIssue(issue)}
-              className="group cursor-pointer p-6 rounded-3xl glass border border-white/10 bg-slate-900/40 hover:bg-white/5 transition-all relative overflow-hidden flex flex-col h-full"
+              className="group cursor-pointer p-6 rounded-3xl bg-slate-900/60 border border-white/5 hover:bg-slate-800/80 hover:border-blue-500/30 transition-all relative overflow-hidden flex flex-col h-full"
             >
-              {/* Header: Score & Badge */}
               <div className="flex justify-between items-start mb-4">
-                <div className={`px-3 py-1 rounded-xl border flex items-center gap-2 ${getSeverityColor(issue.severity)}`}>
+                <div className={`px-3 py-1 rounded-xl border flex items-center gap-2 ${getSeverityStyle(issue.severity)}`}>
                    <AlertTriangle className="w-3 h-3" />
                    <span className="text-xs font-black">{issue.severity !== null ? `Level ${issue.severity}` : 'Analysis Pending'}</span>
                 </div>
@@ -68,7 +61,6 @@ const IssueList = React.memo(({ issues, isAdmin }) => {
                 </div>
               </div>
 
-              {/* Body */}
               <div className="flex-grow">
                 <h3 className="text-white font-bold text-lg mb-2 group-hover:text-blue-400 transition-colors line-clamp-1">{issue.title}</h3>
                 <p className="text-slate-400 text-sm leading-relaxed line-clamp-2 mb-4">
@@ -93,11 +85,12 @@ const IssueList = React.memo(({ issues, isAdmin }) => {
                     <Shield className="w-3 h-3" />
                     {issue.category || 'Unclassified'}
                   </div>
-                  {getStatusBadge(issue.status)}
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter ${statusStyles[issue.status] || 'bg-slate-800'}`}>
+                    {(issue.status || 'pending').replace('_', ' ')}
+                  </span>
                 </div>
               </div>
 
-              {/* Footer */}
               <div className="pt-4 mt-auto border-t border-white/5 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2 text-slate-500">
@@ -116,7 +109,6 @@ const IssueList = React.memo(({ issues, isAdmin }) => {
                 </div>
               </div>
               
-              {/* Hover Glow */}
               <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
             </motion.div>
           ))}
