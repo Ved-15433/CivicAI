@@ -4,11 +4,11 @@ import Sidebar from '../dashboard/Sidebar';
 import { useIssues } from '../../context/IssueContext';
 
 const DashboardLayout = () => {
-  const { user } = useIssues();
+  const { user, isAdmin } = useIssues();
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 selection:bg-blue-500/30 flex overflow-hidden">
-      <Sidebar user={user} />
+      <Sidebar user={user} isAdmin={isAdmin} />
 
       <main className="flex-1 ml-72 h-screen overflow-hidden relative">
         <Outlet />

@@ -2,7 +2,57 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { X, Shield, MapPin, Calendar, AlertCircle, Clock, Users, Sparkles, Building2 } from 'lucide-react';
 
-const IssueDetailModal = React.memo(({ issue, onClose }) => {
+import { supabase } from '../../lib/supabase';
+
+const IssueDetailModal = React.memo(({ issue, onClose, isAdmin }) => {
+  const [updating, setUpdating] = React.useState(false);
+
+  const updateStatus = async (newStatus) => {
+    setUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('issues')
+        .update({ status: newStatus })
+        .eq('id', issue.id);
+
+      if (error) throw error;
+      onClose();
+    } catch (err) {
+      console.error('Error updating status:', err);
+      alert('Failed to update status');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const getStatusActionButtons = () => {
+    if (!isAdmin) return null;
+
+    const buttons = [
+      { label: 'Acknowledge', status: 'approved', color: 'bg-blue-600 hover:bg-blue-500' },
+      { label: 'In Progress', status: 'in-progress', color: 'bg-indigo-600 hover:bg-indigo-500' },
+      { label: 'Resolve', status: 'resolved', color: 'bg-green-600 hover:bg-green-500' },
+    ];
+
+    return (
+      <div className="pt-6 border-t border-white/10">
+        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Admin Actions</p>
+        <div className="flex flex-wrap gap-3">
+          {buttons.filter(b => b.status !== issue.status).map((btn) => (
+            <button
+              key={btn.status}
+              disabled={updating}
+              onClick={() => updateStatus(btn.status)}
+              className={`flex-1 py-3 px-4 rounded-2xl text-xs font-black text-white uppercase tracking-widest transition-all ${btn.color} disabled:opacity-50`}
+            >
+              {updating ? 'Updating...' : btn.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* Backdrop */}
@@ -27,7 +77,7 @@ const IssueDetailModal = React.memo(({ issue, onClose }) => {
           <div className="relative h-64 md:h-full min-h-[300px]">
             {issue.image_url ? (
               <img 
-                src={`https://ethoqrgqgjpgbwdfwizn.supabase.co/storage/v1/object/public/complaint-images/${issue.image_url}`} 
+                src={issue.image_url.startsWith('http') ? issue.image_url : `https://ethoqrgqgjpgbwdfwizn.supabase.co/storage/v1/object/public/complaint-images/${issue.image_url}`} 
                 alt={issue.title}
                 className="w-full h-full object-cover"
                 loading="lazy"
@@ -181,6 +231,8 @@ const IssueDetailModal = React.memo(({ issue, onClose }) => {
                 </div>
              </div>
           </div>
+
+          {getStatusActionButtons()}
         </div>
       </motion.div>
     </div>

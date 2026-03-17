@@ -4,28 +4,26 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useEffect, useState } from 'react';
 
+import { useIssues } from '../../context/IssueContext';
+
 const Navbar = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  const { user, profile, isAdmin, signOut } = useIssues();
 
   const handleGetStarted = () => {
     if (user) {
-      navigate('/report');
+      if (isAdmin) {
+        navigate('/admin');
+      } else {
+        navigate('/report');
+      }
     } else {
       navigate('/login', { state: { message: "Please sign in to report a civic issue." } });
     }
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+    await signOut();
   };
 
   return (
@@ -44,7 +42,7 @@ const Navbar = () => {
       <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
         <a href="#features" className="hover:text-white transition-colors">Features</a>
         <a href="#how-it-works" className="hover:text-white transition-colors">How it Works</a>
-        <Link to="/dashboard" className="hover:text-white transition-colors">Dashboard</Link>
+        <Link to={isAdmin ? "/admin" : "/dashboard"} className="hover:text-white transition-colors">Dashboard</Link>
       </div>
 
       <div className="flex items-center gap-4">
@@ -57,10 +55,10 @@ const Navbar = () => {
               Sign Out
             </button>
             <button 
-              onClick={() => navigate('/report')}
+              onClick={() => navigate(isAdmin ? '/admin' : '/report')}
               className="px-5 py-2 text-sm font-semibold text-white transition-all duration-300 bg-blue-600 rounded-full hover:bg-blue-500 hover:shadow-lg hover:shadow-blue-500/25"
             >
-              Report New
+              {isAdmin ? 'Admin Panel' : 'Report New'}
             </button>
           </>
         ) : (

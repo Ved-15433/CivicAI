@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, MapPin, Calendar, ArrowRight, Star, AlertTriangle, Info, Users } from 'lucide-react';
 import IssueDetailModal from './IssueDetailModal';
 
-const IssueList = React.memo(({ issues }) => {
+const IssueList = React.memo(({ issues, isAdmin }) => {
   const [selectedIssue, setSelectedIssue] = useState(null);
 
   const getSeverityColor = (severity) => {
@@ -128,6 +128,7 @@ const IssueList = React.memo(({ issues }) => {
           <IssueDetailModal 
             issue={selectedIssue} 
             onClose={() => setSelectedIssue(null)} 
+            isAdmin={isAdmin}
           />
         )}
       </AnimatePresence>

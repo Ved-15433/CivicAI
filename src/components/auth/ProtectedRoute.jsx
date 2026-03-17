@@ -3,10 +3,10 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useIssues } from '../../context/IssueContext';
 
 const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useIssues();
+  const { user, profile, loading } = useIssues();
   const location = useLocation();
 
-  if (loading && !user) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-950">
         <div className="flex flex-col items-center gap-4">
@@ -20,6 +20,11 @@ const ProtectedRoute = ({ children }) => {
   if (!user) {
     // Redirect to login with the message and original path
     return <Navigate to="/login" state={{ message: "Please sign in to report a civic issue.", from: location }} replace />;
+  }
+
+  // If user is admin, they should be on /admin routes
+  if (profile?.role === 'admin' && !location.pathname.startsWith('/admin')) {
+    return <Navigate to="/admin" replace />;
   }
 
   return children;

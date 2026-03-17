@@ -11,19 +11,32 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useIssues } from '../../context/IssueContext';
 
-const Sidebar = React.memo(({ user }) => {
+const Sidebar = React.memo(({ user, isAdmin }) => {
   const navigate = useNavigate();
+  const { signOut } = useIssues();
 
-  const menuItems = [
+  const userMenuItems = [
     { name: 'System Analytics', icon: BarChart3, path: '/dashboard/analytics' },
     { name: 'Prioritized Feed', icon: LayoutList, path: '/dashboard/feed' },
     { name: 'My Complaints', icon: UserCircle, path: '/dashboard/my-complaints' },
   ];
 
+  const adminMenuItems = [
+    { name: 'Analytics', icon: BarChart3, path: '/admin/analytics' },
+    { name: 'Drainage & Flooding', icon: LayoutList, path: '/admin/drainage-flooding' },
+    { name: 'Waste & Sanitation', icon: LayoutList, path: '/admin/waste-sanitation' },
+    { name: 'Roads & Bridges', icon: LayoutList, path: '/admin/roads-bridges' },
+    { name: 'Water Supply', icon: LayoutList, path: '/admin/water-supply' },
+    { name: 'Electricity', icon: LayoutList, path: '/admin/electricity' },
+    { name: 'Others', icon: LayoutList, path: '/admin/others' },
+  ];
+
+  const menuItems = isAdmin ? adminMenuItems : userMenuItems;
+
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+    await signOut();
   };
 
   return (
