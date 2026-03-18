@@ -20,7 +20,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
   const stats = useMemo(() => {
     if (!complaints) return { total: 0, acknowledged: 0, inProgress: 0, resolved: 0 };
-    
+
     return {
       total: complaints.length,
       acknowledged: complaints.filter(c => c.status === 'approved').length,
@@ -53,7 +53,7 @@ const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
       if (combined.includes('road') || combined.includes('bridge') || combined.includes('pothole') || combined.includes('street')) return 'Roads & Bridges';
       if (combined.includes('water supply') || combined.includes('water leak') || (combined.includes('water') && !combined.includes('waste'))) return 'Water Supply';
       if (combined.includes('electr') || combined.includes('power') || combined.includes('light')) return 'Electricity';
-      
+
       return 'Others';
     };
 
@@ -87,8 +87,8 @@ const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
         severityMap[sev]++;
       }
     });
-    const severityData = Object.entries(severityMap).map(([name, value]) => ({ 
-      name: `Lvl ${name}`, 
+    const severityData = Object.entries(severityMap).map(([name, value]) => ({
+      name: `Lvl ${name}`,
       value,
       level: parseInt(name)
     }));
@@ -122,8 +122,8 @@ const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
     >
       <header>
         <div className="flex items-center gap-2 mb-2">
-           <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-           <span className="text-xs font-black text-blue-400 uppercase tracking-widest">Admin Control</span>
+          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+          <span className="text-xs font-black text-blue-400 uppercase tracking-widest">Admin Control</span>
         </div>
         <h2 className="text-4xl font-black text-white tracking-tight">Executive Dashboard</h2>
         <p className="text-slate-500 italic mt-2">Internal monitoring and resource allocation overview.</p>
@@ -155,11 +155,11 @@ const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
           <div className="w-1 h-6 bg-blue-500 rounded-full" />
           <h3 className="text-xl font-black text-white uppercase tracking-tight">System Distribution</h3>
         </div>
-        <IssueCharts 
+        <IssueCharts
           departmentData={chartData.departmentData}
-          categoryData={chartData.categoryData} 
-          severityData={chartData.severityData} 
-          timelineData={chartData.timelineData} 
+          categoryData={chartData.categoryData}
+          severityData={chartData.severityData}
+          timelineData={chartData.timelineData}
         />
       </section>
     </motion.div>

@@ -6,7 +6,11 @@ import {
   LayoutList, 
   UserCircle, 
   LogOut, 
-  ChevronRight
+  ChevronRight,
+  Zap,
+  Trophy,
+  Award,
+  ShieldCheck
 } from 'lucide-react';
 import { useIssues } from '../../context/IssueContext';
 
@@ -18,6 +22,9 @@ const Sidebar = React.memo(({ user, isAdmin }) => {
     { name: 'System Analytics', icon: BarChart3, path: '/dashboard/analytics' },
     { name: 'Prioritized Feed', icon: LayoutList, path: '/dashboard/feed' },
     { name: 'My Complaints', icon: UserCircle, path: '/dashboard/my-complaints' },
+    { name: 'Civic Impact', icon: Zap, path: '/dashboard/impact' },
+    { name: 'Achievements', icon: Award, path: '/dashboard/achievements' },
+    { name: 'Leaderboard', icon: Trophy, path: '/dashboard/leaderboard' },
   ];
 
   const adminMenuItems = [
