@@ -1,10 +1,25 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, MapPin, Calendar, ArrowRight, Star, AlertTriangle, Info, Users } from 'lucide-react';
+import { Shield, MapPin, Calendar, ArrowRight, Star, AlertTriangle, Info, Users, Heart } from 'lucide-react';
+import { useIssues } from '../../context/IssueContext';
 import IssueDetailModal from './IssueDetailModal';
 
 const IssueList = React.memo(({ issues, isAdmin }) => {
+  const { user, upvoteIssue, userUpvotes } = useIssues();
   const [selectedIssue, setSelectedIssue] = useState(null);
+  const [upvotingId, setUpvotingId] = useState(null);
+
+  const hasUpvoted = (issueId) => userUpvotes.some(v => v.issue_id === issueId);
+
+  const handleUpvote = async (e, issueId) => {
+    e.stopPropagation();
+    if (!user) return alert('Please login to support this issue');
+    if (hasUpvoted(issueId)) return;
+
+    setUpvotingId(issueId);
+    await upvoteIssue(issueId);
+    setUpvotingId(null);
+  };
 
   const getSeverityStyle = (severity) => {
     if (severity >= 5) return 'text-red-400 bg-red-500/10 border-red-500/20';
@@ -53,11 +68,28 @@ const IssueList = React.memo(({ issues, isAdmin }) => {
                    <span className="text-xs font-black">{issue.severity !== null ? `Level ${issue.severity}` : 'Analysis Pending'}</span>
                 </div>
                 <div className="flex flex-col items-end">
-                  <div className="flex items-center gap-1.5 text-blue-400">
-                    <Star className="w-4 h-4 fill-current" />
-                    <span className="text-lg font-black">{issue.priority_score !== null ? issue.priority_score.toFixed(1) : '—'}</span>
+                  <div className="flex items-center gap-2">
+                    {user && issue.status !== 'resolved' && (
+                      <button 
+                        onClick={(e) => handleUpvote(e, issue.id)}
+                        disabled={upvotingId === issue.id || hasUpvoted(issue.id)}
+                        className={`p-2 rounded-xl border transition-all ${
+                          hasUpvoted(issue.id) 
+                            ? 'bg-rose-500/10 border-rose-500/30 text-rose-500' 
+                            : 'bg-white/5 border-white/5 hover:border-rose-500/30 text-slate-500 hover:text-rose-500'
+                        }`}
+                      >
+                         <Heart className={`w-3.5 h-3.5 ${hasUpvoted(issue.id) ? 'fill-current' : ''} ${upvotingId === issue.id ? 'animate-pulse' : ''}`} />
+                      </button>
+                    )}
+                    <div className="flex flex-col items-end">
+                      <div className="flex items-center gap-1.5 text-blue-400">
+                        <Star className="w-4 h-4 fill-current" />
+                        <span className="text-lg font-black">{issue.priority_score !== null ? issue.priority_score.toFixed(1) : '—'}</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">Priority</span>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">Priority</span>
                 </div>
               </div>
 

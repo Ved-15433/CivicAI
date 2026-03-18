@@ -7,6 +7,7 @@ export const IssueProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [complaints, setComplaints] = useState([]);
   const [userReports, setUserReports] = useState([]);
+  const [userUpvotes, setUserUpvotes] = useState([]);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userReportsLoading, setUserReportsLoading] = useState(false);
@@ -95,6 +96,52 @@ export const IssueProvider = ({ children }) => {
     }
   }, []);
 
+  const fetchUserUpvotes = useCallback(async (userId) => {
+    if (!userId) {
+      setUserUpvotes([]);
+      return;
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('issue_supports')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      setUserUpvotes(data || []);
+    } catch (err) {
+      console.error('IssueContext: Error fetching user upvotes:', err);
+    }
+  }, []);
+
+  const upvoteIssue = useCallback(async (issueId) => {
+    const currentUser = userRef.current;
+    if (!currentUser) return { error: 'Must be logged in' };
+
+    try {
+      const { data, error } = await supabase
+        .from('issue_supports')
+        .insert({ issue_id: issueId, user_id: currentUser.id })
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === '23505') return { error: 'Already upvoted' };
+        throw error;
+      }
+
+      setUserUpvotes(prev => [...prev, data]);
+      // After upvote, we should refresh the global issues to show updated count and order
+      // But we can also let realtime handle it if it works on updates.
+      // Actually, my trigger updates 'issues' table, so realtime should catch it.
+      return { success: true };
+    } catch (err) {
+      console.error('IssueContext: Error upvoting issue:', err);
+      return { error: err.message };
+    }
+  }, []);
+
   // Combined initialization logic
   useEffect(() => {
     let active = true;
@@ -128,8 +175,9 @@ export const IssueProvider = ({ children }) => {
           // IMPORTANT: We must wait for the profile to determine isAdmin status
           // before we stop the loading state, or ProtectedRoutes will redirect.
           await fetchProfile(currentUser.id);
-          // Reports can stay backgrounded
+          // Reports and Upvotes can stay backgrounded
           fetchUserReports(currentUser.id);
+          fetchUserUpvotes(currentUser.id);
         }
 
       } catch (err) {
@@ -166,7 +214,8 @@ export const IssueProvider = ({ children }) => {
         // Fetch fresh data for the new user
         await Promise.all([
           fetchProfile(newUser.id),
-          fetchUserReports(newUser.id)
+          fetchUserReports(newUser.id),
+          fetchUserUpvotes(newUser.id)
         ]);
       } else {
         setProfile(null);
@@ -220,7 +269,7 @@ export const IssueProvider = ({ children }) => {
       authSub.unsubscribe();
       supabase.removeChannel(channel);
     };
-  }, [fetchProfile, fetchGlobalData, fetchUserReports]);
+  }, [fetchProfile, fetchGlobalData, fetchUserReports, fetchUserUpvotes]);
 
   const signOut = useCallback(async () => {
     try {
@@ -263,22 +312,26 @@ export const IssueProvider = ({ children }) => {
     isAdmin,
     complaints,
     userReports,
+    userUpvotes,
     loading,
     userReportsLoading,
     signOut: handleSignOut,
     refreshData,
-    refreshUserReports
+    refreshUserReports,
+    upvoteIssue
   }), [
     user, 
     profile, 
     isAdmin, 
     complaints, 
     userReports, 
+    userUpvotes,
     loading, 
     userReportsLoading, 
     handleSignOut, 
     refreshData, 
-    refreshUserReports
+    refreshUserReports,
+    upvoteIssue
   ]);
 
   return <IssueContext.Provider value={value}>{children}</IssueContext.Provider>;

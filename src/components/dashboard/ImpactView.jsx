@@ -7,7 +7,8 @@ import {
   CheckCircle2, 
   Clock,
   ChevronRight,
-  Shield
+  Shield,
+  Heart
 } from 'lucide-react';
 import { useIssues } from '../../context/IssueContext';
 
@@ -49,16 +50,17 @@ const ProgressRing = ({ progress, size = 60, stroke = 4 }) => {
 };
 
 const ImpactView = () => {
-  const { userReports, loading } = useIssues();
+  const { userReports, userUpvotes, loading } = useIssues();
 
   const stats = useMemo(() => {
     if (!userReports) return { xp: 0, level: 1, impactScore: 0, resolved: 0, total: 0, citizens: 0 };
     
     const total = userReports.length;
+    const upvotes = userUpvotes?.length || 0;
     const resolved = userReports.filter(r => r.issues?.status === 'resolved').length;
     
-    // XP: 100 per report, 500 per resolved
-    const xp = (total * 100) + (resolved * 500);
+    // XP: 100 per report, 500 per resolved, 5 per upvote
+    const xp = (total * 100) + (resolved * 500) + (upvotes * 5);
     
     // Level: Every 1500 XP is a level
     const level = Math.floor(xp / 1500) + 1;
@@ -90,9 +92,10 @@ const ImpactView = () => {
       impactScore, 
       resolved, 
       total, 
+      upvotes,
       citizens 
     };
-  }, [userReports]);
+  }, [userReports, userUpvotes]);
 
   const levels = [
     "Civic Beginner",
@@ -171,9 +174,10 @@ const ImpactView = () => {
       </div>
 
       {/* Breakdown Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           { label: 'Complaints Sent', value: stats.total, icon: Clock, color: 'text-blue-400' },
+          { label: 'Issues Supported', value: stats.upvotes, icon: Heart, color: 'text-rose-400' },
           { label: 'Issues Resolved', value: stats.resolved, icon: CheckCircle2, color: 'text-emerald-400' },
           { label: 'Citizens Impacted', value: stats.citizens, icon: Users, color: 'text-purple-400' }
         ].map((item, i) => (

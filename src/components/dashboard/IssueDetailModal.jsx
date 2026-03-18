@@ -1,11 +1,31 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X, Shield, MapPin, Calendar, AlertCircle, Clock, Users, Sparkles, Building2 } from 'lucide-react';
+import { X, Shield, MapPin, Calendar, AlertCircle, Clock, Users, Sparkles, Building2, Heart, CheckCircle2 } from 'lucide-react';
+import { useIssues } from '../../context/IssueContext';
 
 import { supabase } from '../../lib/supabase';
 
 const IssueDetailModal = React.memo(({ issue, onClose, isAdmin }) => {
+  const { user, upvoteIssue, userUpvotes } = useIssues();
   const [updating, setUpdating] = React.useState(false);
+  const [upvoting, setUpvoting] = React.useState(false);
+
+  const hasUpvoted = React.useMemo(() => {
+    return userUpvotes.some(v => v.issue_id === issue.id);
+  }, [userUpvotes, issue.id]);
+
+  const handleUpvote = async () => {
+    if (!user) return alert('Please login to support this issue');
+    if (hasUpvoted) return;
+
+    setUpvoting(true);
+    const result = await upvoteIssue(issue.id);
+    setUpvoting(false);
+
+    if (result.error) {
+      alert(result.error);
+    }
+  };
 
   const updateStatus = async (newStatus) => {
     setUpdating(true);
@@ -212,6 +232,35 @@ const IssueDetailModal = React.memo(({ issue, onClose, isAdmin }) => {
           </div>
 
           <div className="flex flex-col md:flex-row gap-4 pt-4 border-t border-white/5">
+             <button
+               disabled={upvoting || hasUpvoted || !user || issue.status === 'resolved'}
+               onClick={handleUpvote}
+               className={`flex-1 p-4 rounded-2xl border flex items-center gap-4 transition-all ${
+                 hasUpvoted 
+                   ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 group cursor-default' 
+                   : (issue.status === 'resolved' 
+                      ? 'bg-slate-800 border-white/5 text-slate-500 cursor-not-allowed'
+                      : 'bg-white/5 border-white/5 hover:border-rose-500/30 text-slate-400 hover:text-rose-400')
+               }`}
+             >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                  hasUpvoted ? 'bg-rose-500/20 text-rose-500' : 'bg-slate-800 text-slate-500 group-hover:text-rose-500'
+                }`}>
+                   <Heart className={`w-5 h-5 ${hasUpvoted ? 'fill-current' : ''}`} />
+                </div>
+                <div className="text-left">
+                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">
+                     {hasUpvoted ? 'Thank you' : (issue.status === 'resolved' ? 'Resolution' : 'Community Support')}
+                   </p>
+                   <p className="text-sm font-bold uppercase">
+                     {hasUpvoted ? 'Already Supported' : (issue.status === 'resolved' ? 'Issue Resolved' : "I'm also affected")}
+                   </p>
+                </div>
+                {hasUpvoted && (
+                  <CheckCircle2 className="w-5 h-5 ml-auto text-rose-500" />
+                )}
+             </button>
+
              <div className="flex-1 p-4 rounded-2xl bg-slate-950/50 border border-white/5 flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400">
                    <Building2 className="w-5 h-5" />
@@ -219,15 +268,6 @@ const IssueDetailModal = React.memo(({ issue, onClose, isAdmin }) => {
                 <div>
                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Assigned Unit</p>
                    <p className="text-sm font-bold text-white truncate">{issue.departments?.name || 'In Triage'}</p>
-                </div>
-             </div>
-             <div className="flex-1 p-4 rounded-2xl bg-slate-950/50 border border-white/5 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400">
-                   <Shield className="w-5 h-5" />
-                </div>
-                <div>
-                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Investigation</p>
-                   <p className="text-sm font-bold text-white uppercase">{issue.status.replace('_', ' ')}</p>
                 </div>
              </div>
           </div>

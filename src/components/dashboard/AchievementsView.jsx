@@ -9,7 +9,8 @@ import {
   Star,
   Zap,
   ShieldAlert,
-  Award
+  Award,
+  Heart
 } from 'lucide-react';
 import { useIssues } from '../../context/IssueContext';
 
@@ -60,7 +61,7 @@ const Badge = ({ icon: Icon, title, description, isUnlocked, delay }) => {
 };
 
 const AchievementsView = () => {
-  const { userReports, loading } = useIssues();
+  const { userReports, userUpvotes, loading } = useIssues();
 
   const achievements = useMemo(() => {
     if (!userReports) return [];
@@ -134,9 +135,16 @@ const AchievementsView = () => {
         description: 'Achieve 5 resolved reports in the system.',
         icon: Trophy,
         condition: resolvedCount >= 5
+      },
+      {
+        id: 'civic_supporter',
+        title: 'Civic Supporter',
+        description: 'Support 5 existing issues to help prioritize them.',
+        icon: Heart,
+        condition: (userUpvotes?.length || 0) >= 5
       }
     ];
-  }, [userReports]);
+  }, [userReports, userUpvotes]);
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
