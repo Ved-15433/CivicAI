@@ -1,9 +1,32 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import IssueCharts from '../dashboard/IssueCharts';
-import { BarChart3, Activity, CheckCircle2 } from 'lucide-react';
+import { BarChart3, Activity, CheckCircle2, Clock, ShieldAlert } from 'lucide-react';
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1'];
+
+const DEPARTMENTS = [
+  'Drainage & Flooding',
+  'Waste & Sanitation',
+  'Roads & Bridges',
+  'Water Supply',
+  'Electricity',
+  'Others'
+];
+
+const normalizeDepartment = (issue) => {
+  const category = (issue.category || '').toLowerCase();
+  const deptName = (issue.departments?.name || '').toLowerCase();
+  const combined = `${category} ${deptName}`;
+
+  if (combined.includes('drainage') || combined.includes('flood')) return 'Drainage & Flooding';
+  if (combined.includes('waste') || combined.includes('sanitation') || combined.includes('sewage') || combined.includes('garbage') || combined.includes('trash')) return 'Waste & Sanitation';
+  if (combined.includes('road') || combined.includes('bridge') || combined.includes('pothole') || combined.includes('street')) return 'Roads & Bridges';
+  if (combined.includes('water supply') || combined.includes('water leak') || (combined.includes('water') && !combined.includes('waste'))) return 'Water Supply';
+  if (combined.includes('electr') || combined.includes('power') || combined.includes('light')) return 'Electricity';
+
+  return 'Others';
+};
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -19,13 +42,29 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
   const stats = useMemo(() => {
-    if (!complaints) return { total: 0, acknowledged: 0, inProgress: 0, resolved: 0 };
+    if (!complaints) return { total: 0, pending: 0, acknowledged: 0, inProgress: 0, resolved: 0, departmentStats: {} };
+
+    const deptStats = {};
+    DEPARTMENTS.forEach(d => {
+      deptStats[d] = { total: 0, inProgress: 0, resolved: 0 };
+    });
+
+    complaints.forEach(c => {
+      const dept = normalizeDepartment(c);
+      if (deptStats[dept]) {
+        deptStats[dept].total++;
+        if (c.status === 'in-progress') deptStats[dept].inProgress++;
+        if (c.status === 'resolved') deptStats[dept].resolved++;
+      }
+    });
 
     return {
       total: complaints.length,
+      pending: complaints.filter(c => c.status === 'pending' || !c.status).length,
       acknowledged: complaints.filter(c => c.status === 'approved').length,
       inProgress: complaints.filter(c => c.status === 'in-progress').length,
       resolved: complaints.filter(c => c.status === 'resolved').length,
+      departmentStats: deptStats
     };
   }, [complaints]);
 
@@ -33,29 +72,6 @@ const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
     if (!complaints || complaints.length === 0) {
       return { departmentData: [], categoryData: [], statusData: [], timelineData: [], severityData: [] };
     }
-
-    const DEPARTMENTS = [
-      'Drainage & Flooding',
-      'Waste & Sanitation',
-      'Roads & Bridges',
-      'Water Supply',
-      'Electricity',
-      'Others'
-    ];
-
-    const normalizeDepartment = (issue) => {
-      const category = (issue.category || '').toLowerCase();
-      const deptName = (issue.departments?.name || '').toLowerCase();
-      const combined = `${category} ${deptName}`;
-
-      if (combined.includes('drainage') || combined.includes('flood')) return 'Drainage & Flooding';
-      if (combined.includes('waste') || combined.includes('sanitation') || combined.includes('sewage') || combined.includes('garbage') || combined.includes('trash')) return 'Waste & Sanitation';
-      if (combined.includes('road') || combined.includes('bridge') || combined.includes('pothole') || combined.includes('street')) return 'Roads & Bridges';
-      if (combined.includes('water supply') || combined.includes('water leak') || (combined.includes('water') && !combined.includes('waste'))) return 'Water Supply';
-      if (combined.includes('electr') || combined.includes('power') || combined.includes('light')) return 'Electricity';
-
-      return 'Others';
-    };
 
     // 1. Issues per Department (Normalized)
     const deptMap = {};
@@ -130,9 +146,10 @@ const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
       </header>
 
       {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
         {[
           { label: 'Total Complaints', value: stats.total, color: 'blue', icon: BarChart3 },
+          { label: 'Pending', value: stats.pending, color: 'slate', icon: Clock },
           { label: 'Acknowledged', value: stats.acknowledged, color: 'amber', icon: Activity },
           { label: 'In Progress', value: stats.inProgress, color: 'indigo', icon: Activity },
           { label: 'Resolved', value: stats.resolved, color: 'green', icon: CheckCircle2 },
@@ -149,6 +166,60 @@ const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
           </div>
         ))}
       </div>
+
+      {/* Departmental Breakdown Card Group */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="w-1 h-6 bg-indigo-500 rounded-full" />
+          <h3 className="text-xl font-black text-white uppercase tracking-tight">Departmental Status Breakdown</h3>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {DEPARTMENTS.map((dept, idx) => {
+            const data = stats.departmentStats[dept] || { total: 0, inProgress: 0, resolved: 0 };
+            return (
+              <div key={idx} className="glass p-8 rounded-[2.5rem] border border-white/5 bg-slate-900/40 relative group overflow-hidden transition-all hover:bg-slate-900/60 hover:border-white/10">
+                <div className={`absolute -right-6 -top-6 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full group-hover:bg-indigo-500/10 transition-colors`} />
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h4 className="text-xl font-black text-white tracking-tight">{dept}</h4>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Sector Metrics</p>
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform">
+                      <ShieldAlert size={22} />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-6">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Reported</p>
+                      <p className="text-2xl font-black text-white">{data.total}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">In Progress</p>
+                      <p className="text-2xl font-black text-indigo-400">{data.inProgress}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-green-400 uppercase tracking-widest">Resolved</p>
+                      <p className="text-2xl font-black text-green-400">{data.resolved}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Subtle progress bar at bottom */}
+                <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/5 overflow-hidden">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${data.total > 0 ? (data.resolved / data.total) * 100 : 0}%` }}
+                    className="h-full bg-gradient-to-r from-indigo-500 to-green-500 opacity-50" 
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="space-y-6">
         <div className="flex items-center gap-3">
