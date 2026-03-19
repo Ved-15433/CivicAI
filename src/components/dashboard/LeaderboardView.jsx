@@ -247,7 +247,15 @@ const LeaderboardView = () => {
   );
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="space-y-12 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <header>
+        <div className="flex items-center gap-2 mb-2">
+           <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+           <span className="text-xs font-black text-blue-400 uppercase tracking-widest">Global Rankings</span>
+        </div>
+        <h2 className="text-4xl font-black text-white tracking-tight">Leaderboard</h2>
+        <p className="text-slate-500 italic mt-2">Top contributors making a difference in the community.</p>
+      </header>
       {/* Search and Filters */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-900/40 p-6 rounded-[32px] border border-white/5 backdrop-blur-xl">
         <div className="relative w-full md:w-96">

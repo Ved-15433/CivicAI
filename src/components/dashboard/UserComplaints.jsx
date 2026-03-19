@@ -69,7 +69,7 @@ const UserComplaints = React.memo(({ userId }) => {
   }
 
   return (
-    <div className="space-y-8 h-full">
+    <div className="space-y-12 pb-20">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 mb-2">
@@ -104,106 +104,77 @@ const UserComplaints = React.memo(({ userId }) => {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <AnimatePresence mode="popLayout" initial={false}>
-              {complaints.map((issue) => (
-                <motion.div
-                  key={issue.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  className="group relative bg-slate-900/60 border border-white/5 rounded-3xl p-6 hover:bg-slate-800/80 hover:border-blue-500/30 transition-all flex flex-col md:flex-row items-center gap-6"
-                >
-                  {/* Thumbnail */}
-                  <div className="w-full md:w-24 h-24 rounded-2xl bg-slate-950 overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => setSelectedIssue(issue.issues || issue)}>
-                    {issue.image_url ? (
-                      <img 
-                        src={`https://ethoqrgqgjpgbwdfwizn.supabase.co/storage/v1/object/public/complaint-images/${issue.image_url}`} 
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        alt=""
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-800">
-                        <Brain className="w-8 h-8 opacity-20" />
+              {complaints.map((report) => {
+                const issue = report.issues || report;
+                return (
+                  <motion.div
+                    key={report.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    onClick={() => setSelectedIssue(issue)}
+                    className="group cursor-pointer p-6 rounded-3xl bg-slate-900/60 border border-white/5 hover:bg-slate-800/80 hover:border-blue-500/30 transition-all relative overflow-hidden flex flex-col h-full"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter bg-white/5 text-slate-500`}>
+                        {issue.category || 'Triage'}
                       </div>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-grow min-w-0 w-full cursor-pointer" onClick={() => setSelectedIssue(issue.issues || issue)}>
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter bg-white/5 text-slate-500`}>
-                        {issue.issues?.category || issue.category || 'Triage'}
-                      </span>
-                      <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-                         {new Date(issue.created_at).toLocaleDateString()}
-                      </span>
-                      {(issue.issues?.location_label || issue.location_label) && (
-                        <>
-                          <span className="w-1 h-1 rounded-full bg-slate-700" />
-                          <div className="flex items-center gap-1 text-slate-500">
-                            <MapPin className="w-2.5 h-2.5" />
-                            <span className="text-[10px] font-bold uppercase tracking-widest truncate max-w-[150px]">
-                              {issue.issues?.location_label || issue.location_label}
-                            </span>
-                          </div>
-                        </>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={(e) => {
+                             e.stopPropagation();
+                             setIssueToDelete(report.id);
+                             setShowConfirm(true);
+                          }}
+                          className="p-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/10"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <h4 className="text-white font-bold text-lg truncate group-hover:text-blue-400 transition-colors">
-                      {issue.title || issue.issues?.title}
-                    </h4>
-                    <div className="flex items-center gap-4 mt-2">
-                      <div className="flex items-center gap-1.5">
-                        {statusIcons[issue.issues?.analysis_status || issue.analysis_status] || statusIcons.pending}
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                          {statusLabels[issue.issues?.analysis_status || issue.analysis_status] || statusLabels.pending}
-                        </span>
-                      </div>
-                      {(issue.issues?.priority_score || issue.priority_score) && (
-                        <div className="flex items-center gap-1.5 text-blue-400">
-                          <Sparkles className="w-3 h-3" />
-                          <span className="text-xs font-black uppercase tracking-tighter">
-                            Score: {(issue.issues?.priority_score || issue.priority_score).toFixed(1)}
+
+                    <div className="flex-grow">
+                      <h3 className="text-white font-bold text-lg mb-2 group-hover:text-blue-400 transition-colors line-clamp-1">
+                        {report.title || issue.title}
+                      </h3>
+                      <p className="text-slate-400 text-sm leading-relaxed line-clamp-2 mb-4">
+                        {issue.ai_summary || issue.description || report.description}
+                      </p>
+
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="flex items-center gap-1.5">
+                          {statusIcons[issue.analysis_status] || statusIcons.pending}
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                            {statusLabels[issue.analysis_status] || statusLabels.pending}
                           </span>
                         </div>
-                      )}
-                      <div className="flex items-center gap-1.5 text-indigo-400 bg-indigo-500/5 px-2 py-0.5 rounded-lg border border-indigo-500/10">
-                        <Users className="w-3 h-3" />
-                        <span className="text-[10px] font-black uppercase tracking-tighter">
-                          {issue.issues?.unique_user_count || 1} { (issue.issues?.unique_user_count || 1) === 1 ? 'citizen' : 'citizens' }
-                        </span>
+                        {issue.priority_score && (
+                          <div className="flex items-center gap-1.5 text-blue-400">
+                             <Sparkles className="w-3 h-3" />
+                             <span className="text-[10px] font-black uppercase tracking-tighter">
+                               Score: {issue.priority_score.toFixed(1)}
+                             </span>
+                          </div>
+                        )}
                       </div>
-                      {(issue.issues?.unique_user_count || 0) > 1 && (
-                        <span className="hidden sm:inline text-[10px] font-bold text-slate-500 italic">
-                          (Merged into existing issue)
-                        </span>
-                      )}
                     </div>
-                  </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-3 w-full md:w-auto">
-                     <button 
-                      onClick={(e) => {
-                         e.stopPropagation();
-                         setIssueToDelete(issue.id);
-                         setShowConfirm(true);
-                      }}
-                      className="p-3 rounded-2xl bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/10"
-                     >
-                       <Trash2 className="w-5 h-5" />
-                     </button>
-                     <button 
-                      onClick={() => setSelectedIssue(issue.issues || issue)}
-                      className="p-3 rounded-2xl bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-                     >
-                       <ChevronRight className="w-5 h-5 flex-shrink-0" />
-                     </button>
-                  </div>
-                </motion.div>
-              ))}
+                    <div className="pt-4 mt-auto border-t border-white/5 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 text-slate-500 text-[10px] font-bold">
+                          <Clock className="w-3 h-3" />
+                          {new Date(report.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-blue-400 font-bold text-xs uppercase tracking-widest group-hover:gap-2 transition-all">
+                        View <ChevronRight className="w-3 h-3" />
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
           </div>
         )}

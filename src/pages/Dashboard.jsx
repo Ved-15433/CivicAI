@@ -14,7 +14,7 @@ const LeaderboardView = React.lazy(() => import('../components/dashboard/Leaderb
 const TabContainer = React.memo(({ active, children }) => {
   return (
     <div 
-      className={`absolute inset-0 h-full overflow-y-auto pt-12 pb-20 px-10 transition-all duration-300 ${
+      className={`absolute inset-0 h-full overflow-y-auto pt-12 pb-20 px-10 transition-[opacity,transform] duration-300 ease-out will-change-[opacity,transform] ${
         active 
           ? 'opacity-100 translate-y-0 pointer-events-auto z-10' 
           : 'opacity-0 translate-y-4 pointer-events-none z-0'

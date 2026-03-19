@@ -114,7 +114,15 @@ const ImpactView = () => {
   );
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="space-y-12 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <header>
+        <div className="flex items-center gap-2 mb-2">
+           <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+           <span className="text-xs font-black text-blue-400 uppercase tracking-widest">Civic Achievement</span>
+        </div>
+        <h2 className="text-4xl font-black text-white tracking-tight">Civic Impact</h2>
+        <p className="text-slate-500 italic mt-2">Track your personal contribution to the city's health.</p>
+      </header>
       {/* Header / Profile Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <motion.div 

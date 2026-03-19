@@ -16,7 +16,9 @@ const PrioritizedFeed = React.memo(({ complaints, loading }) => {
 
   return (
     <motion.div
-      className="space-y-8"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-12 pb-20"
     >
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
