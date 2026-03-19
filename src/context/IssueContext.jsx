@@ -65,7 +65,7 @@ export const IssueProvider = ({ children }) => {
       if (error) throw error;
       setComplaints(data || []);
       isFetchedRef.current = true;
-      console.log('IssueContext: Global issues fetched');
+      console.log('IssueContext: Global issues fetched', (data || []).length);
     } catch (err) {
       console.error('IssueContext: Error fetching global issues:', err);
     }
@@ -168,17 +168,20 @@ export const IssueProvider = ({ children }) => {
         console.log('INIT 2/4: User identification:', currentUser?.id || 'guest');
         setUser(currentUser);
 
-        // Start fetches
+        // Sync both global and user data before resolving loading
         console.log('INIT 3/4: Data sync started');
-        fetchGlobalData();
+        
+        // Use Promise.all to fetch everything important in parallel but wait for all
+        const fetchPromises = [fetchGlobalData(true)];
+        
         if (currentUser) {
-          // IMPORTANT: We must wait for the profile to determine isAdmin status
-          // before we stop the loading state, or ProtectedRoutes will redirect.
-          await fetchProfile(currentUser.id);
-          // Reports and Upvotes can stay backgrounded
-          fetchUserReports(currentUser.id);
-          fetchUserUpvotes(currentUser.id);
+          fetchPromises.push(fetchProfile(currentUser.id));
+          fetchPromises.push(fetchUserReports(currentUser.id));
+          fetchPromises.push(fetchUserUpvotes(currentUser.id));
         }
+        
+        await Promise.all(fetchPromises);
+        console.log('INIT 4/4: Data sync completed');
 
       } catch (err) {
         console.error('INIT ERROR:', err);
