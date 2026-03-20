@@ -208,10 +208,16 @@ export const IssueProvider = ({ children }) => {
     });
 
     try {
+      // If status is being updated to Resolved, set resolved_at
+      const finalUpdates = { ...updates };
+      if (updates.status === 'Resolved') {
+        finalUpdates.resolved_at = new Date().toISOString();
+      }
+
       // 2. Remote DB update
       const { error } = await supabase
         .from('issues')
-        .update(updates)
+        .update(finalUpdates)
         .eq('id', issueId);
 
       if (error) throw error;

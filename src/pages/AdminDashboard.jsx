@@ -4,6 +4,7 @@ import { useIssues } from '../context/IssueContext';
 
 const AdminAnalyticsView = lazy(() => import('../components/admin/AdminAnalyticsView'));
 const AdminDepartmentView = lazy(() => import('../components/admin/AdminDepartmentView'));
+import IssueMap from '../components/dashboard/IssueMap';
 
 const TabContainer = React.memo(({ active, children }) => {
   return (
@@ -30,6 +31,7 @@ const AdminDashboard = () => {
     const segments = location.pathname.split('/');
     const last = segments.pop();
     if (last === 'analytics') return 'analytics';
+    if (last === 'map') return 'map';
     if (departmentId) return departmentId;
     return 'analytics';
   }, [location.pathname, departmentId]);
@@ -54,8 +56,14 @@ const AdminDashboard = () => {
         </Suspense>
       </TabContainer>
 
+      <TabContainer active={activeTab === 'map'}>
+        <div className="h-[75vh] w-full mt-4">
+          <IssueMap issues={complaints} loading={loading} />
+        </div>
+      </TabContainer>
+
       {/* Dynamic Department Views */}
-      <TabContainer active={activeTab !== 'analytics'}>
+      <TabContainer active={activeTab !== 'analytics' && activeTab !== 'map'}>
         <Suspense fallback={null}>
           <AdminDepartmentView 
             title={viewTitle} 

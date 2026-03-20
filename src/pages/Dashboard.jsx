@@ -5,6 +5,7 @@ import { useIssues } from '../context/IssueContext';
 import AnalyticsView from '../components/dashboard/AnalyticsView';
 import PrioritizedFeed from '../components/dashboard/PrioritizedFeed';
 import UserComplaints from '../components/dashboard/UserComplaints';
+import IssueMap from '../components/dashboard/IssueMap';
 
 // Gamification Early Views
 const ImpactView = React.lazy(() => import('../components/dashboard/ImpactView'));
@@ -43,6 +44,12 @@ const Dashboard = () => {
     <>
       <TabContainer active={activeTab === 'analytics'}>
         <AnalyticsView complaints={complaints} loading={loading} />
+      </TabContainer>
+
+      <TabContainer active={activeTab === 'map'}>
+        <div className="h-[75vh] w-full mt-4">
+          <IssueMap issues={complaints} loading={loading} />
+        </div>
       </TabContainer>
 
       <TabContainer active={activeTab === 'feed'}>

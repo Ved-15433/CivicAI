@@ -32,6 +32,7 @@ function App() {
               <Route path="dashboard" element={<Dashboard />}>
                 <Route index element={<Navigate to="analytics" replace />} />
                 <Route path="analytics" element={null} />
+                <Route path="map" element={null} />
                 <Route path="feed" element={null} />
                 <Route path="my-complaints" element={null} />
                 <Route path="impact" element={null} />
@@ -51,6 +52,7 @@ function App() {
             >
               <Route index element={<Navigate to="analytics" replace />} />
               <Route path="analytics" element={<AdminDashboard />} />
+              <Route path="map" element={<AdminDashboard />} />
               <Route path=":departmentId" element={<AdminDashboard />} />
             </Route>
 
