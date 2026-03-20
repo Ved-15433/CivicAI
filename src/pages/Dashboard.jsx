@@ -12,6 +12,7 @@ const ImpactView = React.lazy(() => import('../components/dashboard/ImpactView')
 const AchievementsView = React.lazy(() => import('../components/dashboard/AchievementsView'));
 const LeaderboardView = React.lazy(() => import('../components/dashboard/LeaderboardView'));
 const ProfileView = React.lazy(() => import('../components/dashboard/ProfileView'));
+const CommunityView = React.lazy(() => import('../components/dashboard/CommunityView'));
 
 const TabContainer = React.memo(({ active, children }) => {
   return (
@@ -86,6 +87,12 @@ const Dashboard = () => {
         </React.Suspense>
       </TabContainer>
       
+      <TabContainer active={activeTab === 'community'}>
+        <React.Suspense fallback={null}>
+          <CommunityView />
+        </React.Suspense>
+      </TabContainer>
+
       <TabContainer active={activeTab === 'responsible-authorities'}>
         <React.Suspense fallback={null}>
           <AuthoritiesView />

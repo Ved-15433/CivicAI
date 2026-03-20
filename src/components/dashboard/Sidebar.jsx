@@ -11,7 +11,8 @@ import {
   Trophy,
   Award,
   ShieldCheck,
-  MapPin
+  MapPin,
+  Users
 } from 'lucide-react';
 import { useIssues } from '../../context/IssueContext';
 
@@ -24,6 +25,7 @@ const Sidebar = React.memo(({ user, isAdmin }) => {
     { name: 'Live Map', icon: MapPin, path: '/dashboard/map' },
     { name: 'Responsible Authorities', icon: ShieldCheck, path: '/dashboard/responsible-authorities' },
     { name: 'Prioritized Feed', icon: LayoutList, path: '/dashboard/feed' },
+    { name: 'Community', icon: Users, path: '/dashboard/community' },
     { name: 'My Complaints', icon: UserCircle, path: '/dashboard/my-complaints' },
     { name: 'Civic Impact', icon: Zap, path: '/dashboard/impact' },
     { name: 'Achievements', icon: Award, path: '/dashboard/achievements' },

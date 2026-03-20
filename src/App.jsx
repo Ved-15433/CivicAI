@@ -34,6 +34,7 @@ function App() {
                 <Route path="analytics" element={null} />
                 <Route path="map" element={null} />
                 <Route path="feed" element={null} />
+                <Route path="community" element={null} />
                 <Route path="my-complaints" element={null} />
                 <Route path="impact" element={null} />
                 <Route path="achievements" element={null} />
