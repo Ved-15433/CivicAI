@@ -165,33 +165,33 @@ const IssueMap = ({ issues, loading }) => {
   }
 
   return (
-    <div className="w-full h-full min-h-[500px] rounded-[2.5rem] overflow-hidden border border-white/10 relative shadow-2xl bg-slate-900">
+    <div className="w-full h-full min-h-[500px] rounded-[2.5rem] overflow-hidden border border-slate-200 relative shadow-2xl bg-slate-50">
       {/* Map Header Overlay */}
       <div className="absolute top-6 left-6 z-[1000] pointer-events-none">
-        <div className="bg-slate-950/80 backdrop-blur-md px-6 py-4 rounded-3xl border border-white/10 shadow-2xl flex items-center gap-4">
+        <div className="bg-white/80 backdrop-blur-md px-6 py-4 rounded-3xl border border-slate-200 shadow-xl flex items-center gap-4">
           <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
-            <MapPin size={22} />
+            <MapPin size={22} className="animate-bounce" />
           </div>
           <div>
-            <h4 className="text-lg font-black text-white tracking-tight leading-none">Live Issue Network</h4>
-            <p className="text-[10px] text-blue-400 font-bold uppercase tracking-widest mt-1">Real-time Civic Telemetry</p>
+            <h4 className="text-lg font-black text-slate-900 tracking-tight leading-none">Live Issue Network</h4>
+            <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest mt-1">Real-time Civic Telemetry</p>
           </div>
         </div>
       </div>
 
       {/* Legend Overlay */}
       <div className="absolute bottom-6 right-6 z-[1000] pointer-events-none">
-        <div className="bg-slate-950/80 backdrop-blur-md px-5 py-4 rounded-3xl border border-white/10 shadow-2xl space-y-3">
-          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 font-mono">Telemetry Key</p>
+        <div className="bg-white/80 backdrop-blur-md px-5 py-4 rounded-3xl border border-slate-200 shadow-xl space-y-3">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 font-mono text-center">Telemetry Index</p>
           {[
-            { label: 'Unresolved Case', color: '#f43f5e' },
-            { label: 'Units Active', color: '#f59e0b' },
-            { label: 'Cleared (Last 48h)', color: '#10b981' },
-            { label: 'Your Position', color: '#2563eb' },
+            { label: 'Unresolved Case', color: 'bg-rose-500' },
+            { label: 'Units Active', color: 'bg-amber-500' },
+            { label: 'Cleared (48h)', color: 'bg-emerald-500' },
+            { label: 'Your Position', color: 'bg-blue-600' },
           ].map((item, i) => (
             <div key={i} className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full shadow-lg" style={{ backgroundColor: item.color }} />
-              <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">{item.label}</span>
+              <div className={`w-2 h-2 rounded-full ${item.color} shadow-sm`} />
+              <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest whitespace-nowrap">{item.label}</span>
             </div>
           ))}
         </div>
@@ -201,13 +201,13 @@ const IssueMap = ({ issues, loading }) => {
         center={mapCenter} 
         zoom={13} 
         className="w-full h-full"
-        style={{ background: '#0f172a' }}
+        style={{ background: '#f8fafc' }}
       >
         <MapController center={mapCenter} />
         
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         />
 
         {/* User Current Location Marker */}
@@ -302,7 +302,7 @@ const IssueMap = ({ issues, loading }) => {
           border: none !important;
         }
         .leaflet-container {
-          filter: grayscale(0.5) contrast(1.1) brightness(0.9);
+          filter: none;
         }
       `}</style>
     </div>
