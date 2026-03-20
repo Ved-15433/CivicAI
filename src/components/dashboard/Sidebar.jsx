@@ -12,13 +12,16 @@ import {
   Award,
   ShieldCheck,
   MapPin,
-  Users
+  Users,
+  Bell
 } from 'lucide-react';
 import { useIssues } from '../../context/IssueContext';
+import NotificationList from './NotificationList';
 
 const Sidebar = React.memo(({ user, isAdmin }) => {
   const navigate = useNavigate();
-  const { signOut, profile } = useIssues();
+  const { signOut, profile, unreadCount } = useIssues();
+  const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
 
   const userMenuItems = [
     { name: 'System Analytics', icon: BarChart3, path: '/dashboard/analytics' },
@@ -97,22 +100,37 @@ const Sidebar = React.memo(({ user, isAdmin }) => {
 
       {/* User Section */}
       <div className="mt-auto border-t border-white/5 pt-6 space-y-4">
-        <div 
-          onClick={() => navigate('/dashboard/profile')}
-          className="flex items-center gap-3 px-4 group/user cursor-pointer hover:bg-white/5 py-3 rounded-2xl transition-all"
-        >
-          <div className="w-10 h-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-slate-400 font-bold overflow-hidden transition-transform group-hover/user:scale-110">
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-            ) : (
-              (profile?.full_name || user?.email)?.[0].toUpperCase() || 'U'
+        <div className="flex items-center gap-2">
+          {/* Bell Icon */}
+          <button 
+            onClick={() => setIsNotificationsOpen(true)}
+            className="relative p-3 rounded-2xl bg-white/5 border border-white/5 text-slate-400 hover:bg-blue-600/10 hover:text-blue-400 transition-all flex items-center justify-center shrink-0 group/bell"
+          >
+            <Bell className="w-5 h-5 group-hover/bell:scale-110 transition-transform" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 bg-blue-600 text-white text-[10px] font-black rounded-lg flex items-center justify-center border-2 border-slate-900 shadow-lg animate-pulse">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
             )}
-          </div>
-          <div className="flex-grow min-w-0">
-            <p className="text-sm font-bold text-white truncate transition-colors group-hover/user:text-blue-400">
-              {profile?.username || profile?.full_name || user?.email?.split('@')[0]}
-            </p>
-            <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
+          </button>
+
+          <div 
+            onClick={() => navigate('/dashboard/profile')}
+            className="flex-grow flex items-center gap-3 px-3 py-3 rounded-2xl group/user cursor-pointer hover:bg-white/5 transition-all min-w-0"
+          >
+            <div className="w-10 h-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-slate-400 font-bold overflow-hidden transition-transform group-hover/user:scale-110 shrink-0">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                (profile?.full_name || user?.email)?.[0]?.toUpperCase() || 'U'
+              )}
+            </div>
+            <div className="flex-grow min-w-0">
+              <p className="text-sm font-bold text-white truncate transition-colors group-hover/user:text-blue-400">
+                {profile?.username || profile?.full_name || user?.email?.split('@')[0]}
+              </p>
+              <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
+            </div>
           </div>
         </div>
         
@@ -124,6 +142,15 @@ const Sidebar = React.memo(({ user, isAdmin }) => {
           <span className="text-sm font-bold">Sign Out</span>
         </button>
       </div>
+
+      <NotificationList 
+        isOpen={isNotificationsOpen} 
+        onClose={() => setIsNotificationsOpen(false)}
+        onUserClick={(userId) => {
+          // If already on profile page, we might need to refresh or just navigate
+          navigate(`/dashboard/community?user=${userId}`);
+        }}
+      />
     </aside>
   );
 });

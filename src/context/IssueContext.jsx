@@ -9,6 +9,7 @@ export const IssueProvider = ({ children }) => {
   const [userReports, setUserReports] = useState([]);
   const [userUpvotes, setUserUpvotes] = useState([]);
   const [profile, setProfile] = useState(null);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userReportsLoading, setUserReportsLoading] = useState(false);
   const isFetchedRef = useRef(false);
@@ -112,6 +113,51 @@ export const IssueProvider = ({ children }) => {
       setUserUpvotes(data || []);
     } catch (err) {
       console.error('IssueContext: Error fetching user upvotes:', err);
+    }
+  }, []);
+
+  const fetchNotifications = useCallback(async (userId) => {
+    if (!userId) {
+      setNotifications([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select(`
+          *,
+          actor:profiles!actor_user_id(username, avatar_url, role, id),
+          issue:related_issue_id(*),
+          complaint:related_complaint_id(*)
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setNotifications(data || []);
+      console.log('IssueContext: Notifications fetched', (data || []).length);
+    } catch (err) {
+      console.error('IssueContext: Error fetching notifications:', err);
+    }
+  }, []);
+
+  const markNotificationAsRead = useCallback(async (notificationId) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+
+      if (error) throw error;
+      
+      setNotifications(prev => prev.map(n => 
+        n.id === notificationId ? { ...n, is_read: true } : n
+      ));
+      return { success: true };
+    } catch (err) {
+      console.error('IssueContext: Error marking notification as read:', err);
+      return { error: err.message };
     }
   }, []);
 
@@ -266,6 +312,7 @@ export const IssueProvider = ({ children }) => {
           fetchPromises.push(fetchProfile(currentUser.id));
           fetchPromises.push(fetchUserReports(currentUser.id));
           fetchPromises.push(fetchUserUpvotes(currentUser.id));
+          fetchPromises.push(fetchNotifications(currentUser.id));
         }
         
         await Promise.all(fetchPromises);
@@ -306,7 +353,8 @@ export const IssueProvider = ({ children }) => {
         await Promise.all([
           fetchProfile(newUser.id),
           fetchUserReports(newUser.id),
-          fetchUserUpvotes(newUser.id)
+          fetchUserUpvotes(newUser.id),
+          fetchNotifications(newUser.id)
         ]);
       } else {
         setProfile(null);
@@ -371,6 +419,26 @@ export const IssueProvider = ({ children }) => {
           }
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications' },
+        (payload) => {
+          const currentUser = userRef.current;
+          if (!active || !currentUser) return;
+          const isRelevant = payload.new?.user_id === currentUser.id || payload.old?.user_id === currentUser.id;
+          if (isRelevant) {
+            if (payload.eventType === 'INSERT') {
+              // Fetch again to get the actor profile join correctly?
+              // Or just manually fetch notifications on insert
+              fetchNotifications(currentUser.id);
+            } else if (payload.eventType === 'UPDATE') {
+              setNotifications(prev => prev.map(n => n.id === payload.new.id ? { ...n, ...payload.new } : n));
+            } else if (payload.eventType === 'DELETE') {
+              setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
+            }
+          }
+        }
+      )
       .subscribe();
 
     return () => {
@@ -430,7 +498,10 @@ export const IssueProvider = ({ children }) => {
     upvoteIssue,
     updateIssue,
     updateProfile,
-    uploadAvatar
+    uploadAvatar,
+    notifications,
+    unreadCount: notifications.filter(n => !n.is_read).length,
+    markNotificationAsRead
   }), [
     user, 
     profile, 
@@ -446,7 +517,8 @@ export const IssueProvider = ({ children }) => {
     upvoteIssue,
     updateIssue,
     updateProfile,
-    uploadAvatar
+    uploadAvatar,
+    notifications
   ]);
 
   return <IssueContext.Provider value={value}>{children}</IssueContext.Provider>;

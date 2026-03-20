@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 import { 
   Users, 
   Plus, 
@@ -33,6 +34,8 @@ const CommunityView = () => {
   const [filter, setFilter] = useState('all'); // 'all', 'following', 'before-after'
   const [userFollows, setUserFollows] = useState([]);
   const [activeTab, setActiveTab] = useState('community');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const userIdFromUrl = searchParams.get('user');
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -95,6 +98,15 @@ const CommunityView = () => {
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]);
+
+  useEffect(() => {
+    if (userIdFromUrl) {
+      setSelectedUserId(userIdFromUrl);
+      setIsUserModalOpen(true);
+      // Clean up the URL after opening the modal
+      setSearchParams({});
+    }
+  }, [userIdFromUrl, setSearchParams]);
 
   const handleUserClick = (userId) => {
     setSelectedUserId(userId);
