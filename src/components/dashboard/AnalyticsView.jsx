@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import IssueCharts from './IssueCharts';
 import { BarChart3, Activity, CheckCircle2, Users, ShieldAlert } from 'lucide-react';
+import { useIssues } from '../../context/IssueContext';
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1'];
 
@@ -28,7 +29,8 @@ const normalizeDepartment = (issue) => {
   return 'Others';
 };
 
-const AnalyticsView = React.memo(({ complaints, loading }) => {
+const AnalyticsView = React.memo(() => {
+  const { complaints, loading } = useIssues();
   const stats = useMemo(() => {
     if (!complaints) return { total: 0, citizens: 0, acknowledged: 0, inProgress: 0, resolved: 0, departmentStats: {} };
 

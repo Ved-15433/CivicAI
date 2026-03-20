@@ -284,22 +284,43 @@ export const IssueProvider = ({ children }) => {
       console.log('INIT 1/4: Establishing session...');
       setLoading(true);
 
-      // HARD FAILSAFE: Never stay in loading more than 2s
+      // HARD FAILSAFE: Never stay in loading more than 10s (increased for Chrome compatibility)
       const timeout = setTimeout(() => {
         if (active) {
           console.warn('INIT TIMEOUT: Emergency breakout');
           setLoading(false);
         }
-      }, 2000);
+      }, 10000);
 
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) throw sessionError;
+        
+        // SELF-HEALING: If session restore fails with 400 or invalid refresh token,
+        // it means the client state is stale/corrupted. Clear it hard.
+        if (sessionError) {
+          console.error('INIT ERROR: Session restore failure:', sessionError);
+          if (sessionError.status === 400 || sessionError.message?.includes('Refresh Token Not Found')) {
+            console.warn('STALE STATE DETECTED: Hard clearing Supabase storage keys');
+            Object.keys(localStorage).forEach(key => {
+              if (key.includes('supabase.auth.token') || key.startsWith('sb-')) {
+                localStorage.removeItem(key);
+              }
+            });
+            localStorage.removeItem('isAdmin');
+          }
+          throw sessionError;
+        }
         
         if (!active) return;
 
         const currentUser = session?.user ?? null;
         console.log('INIT 2/4: User identification:', currentUser?.id || 'guest');
+        
+        // SELF-HEALING: If no session found, clear the local admin bypass flag
+        if (!currentUser) {
+          localStorage.removeItem('isAdmin');
+        }
+        
         setUser(currentUser);
 
         // Sync both global and user data before resolving loading

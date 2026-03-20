@@ -18,7 +18,7 @@ import {
 import { useIssues } from '../../context/IssueContext';
 import NotificationList from './NotificationList';
 
-const Sidebar = React.memo(({ user, isAdmin }) => {
+const Sidebar = ({ user, isAdmin }) => {
   const navigate = useNavigate();
   const { signOut, profile, unreadCount } = useIssues();
   const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
@@ -153,6 +153,6 @@ const Sidebar = React.memo(({ user, isAdmin }) => {
       />
     </aside>
   );
-});
+};
 
 export default Sidebar;

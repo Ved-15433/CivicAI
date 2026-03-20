@@ -2,8 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Filter } from 'lucide-react';
 import IssueList from './IssueList';
+import { useIssues } from '../../context/IssueContext';
 
-const PrioritizedFeed = React.memo(({ complaints, loading }) => {
+const PrioritizedFeed = React.memo(() => {
+  const { complaints, loading } = useIssues();
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredComplaints = useMemo(() => {

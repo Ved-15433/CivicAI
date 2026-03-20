@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap } from 're
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapPin, Users, Building2, Clock, Navigation } from 'lucide-react';
+import { useIssues } from '../../context/IssueContext';
 
 // Fix for default Leaflet icon not showing correctly in Vite/React
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -75,7 +76,8 @@ const MapController = ({ center }) => {
   return null;
 };
 
-const IssueMap = ({ issues, loading }) => {
+const IssueMap = () => {
+  const { complaints: issues, loading } = useIssues();
   const [userLocation, setUserLocation] = useState(null);
   const [mapCenter, setMapCenter] = useState([19.0760, 72.8777]); // Default Mumbai
   const [hasSetInitialCenter, setHasSetInitialCenter] = useState(false);

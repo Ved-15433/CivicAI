@@ -19,8 +19,8 @@ import { supabase } from '../../lib/supabase';
 import IssueDetailModal from './IssueDetailModal';
 import { useIssues } from '../../context/IssueContext';
 
-const UserComplaints = React.memo(({ userId }) => {
-  const { userReports: complaints, userReportsLoading: loading, isAdmin } = useIssues();
+const UserComplaints = React.memo(() => {
+  const { user, userReports: complaints, userReportsLoading: loading, isAdmin } = useIssues();
   const [deletingId, setDeletingId] = useState(null);
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
