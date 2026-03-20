@@ -60,10 +60,10 @@ const UserComplaints = React.memo(({ userId }) => {
   };
 
   const resolutionStyles = {
-    pending: 'bg-slate-800 text-slate-400',
-    approved: 'bg-blue-500/20 text-blue-400',
-    'in-progress': 'bg-indigo-500/20 text-indigo-400',
-    resolved: 'bg-green-500/20 text-green-400 border border-green-500/30'
+    'Pending': 'bg-slate-800 text-slate-400',
+    'Acknowledged': 'bg-blue-500/20 text-blue-400',
+    'In Progress': 'bg-indigo-500/20 text-indigo-400',
+    'Resolved': 'bg-green-500/20 text-green-400 border border-green-500/30'
   };
 
   if (loading && complaints.length === 0) {
@@ -165,8 +165,8 @@ const UserComplaints = React.memo(({ userId }) => {
                              </span>
                           </div>
                         )}
-                        <div className={`ml-auto px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter ${resolutionStyles[issue.status] || resolutionStyles.pending}`}>
-                           {issue.status === 'approved' ? 'Acknowledged' : (issue.status === 'in-progress' ? 'In Progress' : (issue.status === 'pending' || !issue.status ? 'Reported' : issue.status))}
+                        <div className={`ml-auto px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter ${resolutionStyles[issue.status] || resolutionStyles['Pending']}`}>
+                           {issue.status === 'Acknowledged' ? 'Acknowledged' : (issue.status === 'In Progress' ? 'In Progress' : (issue.status === 'Pending' || !issue.status ? 'Reported' : issue.status))}
                         </div>
                       </div>
                     </div>

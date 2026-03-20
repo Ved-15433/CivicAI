@@ -35,15 +35,21 @@ const IssueDetailModal = React.memo(({ issue: initialIssue, onClose, isAdmin }) 
 
   const updateStatus = async (newStatus) => {
     setUpdating(true);
+    console.log(`[StatusUpdate] Button Clicked: ${newStatus}`);
+    console.log(`[StatusUpdate] Current issue.status: ${issue.status}`);
+    
     try {
-      // Use the context-level updateIssue which handles optimistic local state update 
-      // + remote DB update. This ensures the progress bar reacts INSTANTLY.
+      // Trace details for the update call
+      console.log(`[StatusUpdate] Dispatching updateIssue to table: issues, row: ${issue.id}, column: status, value: ${newStatus}`);
+      
       const result = await updateIssue(issue.id, { status: newStatus });
       
-      if (result.error) throw new Error(result.error);
-      
-      // Do not close the modal on status change to allow viewing of the progress tracker update
-      // onClose(); 
+      if (result.error) {
+        console.error(`[StatusUpdate] Supabase update response ERROR:`, result.error);
+        throw new Error(result.error);
+      } else {
+        console.log(`[StatusUpdate] Supabase update response SUCCESS`);
+      }
     } catch (err) {
       console.error('Error updating status:', err);
       alert('Failed to update status: ' + err.message);
@@ -56,9 +62,9 @@ const IssueDetailModal = React.memo(({ issue: initialIssue, onClose, isAdmin }) 
     if (!isAdmin) return null;
 
     const buttons = [
-      { label: 'Acknowledge', status: 'approved', color: 'bg-blue-600 hover:bg-blue-500' },
-      { label: 'In Progress', status: 'in-progress', color: 'bg-indigo-600 hover:bg-indigo-500' },
-      { label: 'Resolve', status: 'resolved', color: 'bg-green-600 hover:bg-green-500' },
+      { label: 'Acknowledge', status: 'Acknowledged', color: 'bg-blue-600 hover:bg-blue-500' },
+      { label: 'In Progress', status: 'In Progress', color: 'bg-indigo-600 hover:bg-indigo-500' },
+      { label: 'Resolve', status: 'Resolved', color: 'bg-green-600 hover:bg-green-500' },
     ];
 
     return (
@@ -82,10 +88,10 @@ const IssueDetailModal = React.memo(({ issue: initialIssue, onClose, isAdmin }) 
 
   const StatusTracker = ({ status }) => {
     const stages = [
-      { label: 'Reported', status: 'pending', icon: ClipboardList },
-      { label: 'Acknowledged', status: 'approved', icon: ClipboardCheck },
-      { label: 'In Progress', status: 'in-progress', icon: Loader2 },
-      { label: 'Resolved', status: 'resolved', icon: CheckCircle2 },
+      { label: 'Reported', status: 'Pending', icon: ClipboardList },
+      { label: 'Acknowledged', status: 'Acknowledged', icon: ClipboardCheck },
+      { label: 'In Progress', status: 'In Progress', icon: Loader2 },
+      { label: 'Resolved', status: 'Resolved', icon: CheckCircle2 },
     ];
 
     const currentStageIndex = stages.findIndex(s => s.status === status);
@@ -230,15 +236,15 @@ const IssueDetailModal = React.memo(({ issue: initialIssue, onClose, isAdmin }) 
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Live Progress</h4>
               <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter border shadow-sm ${
-                issue.status === 'resolved' 
+                issue.status === 'Resolved' 
                   ? 'bg-green-500/10 border-green-500/30 text-green-400' 
-                  : (issue.status === 'in-progress' 
+                  : (issue.status === 'In Progress' 
                     ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400'
-                    : (issue.status === 'approved' 
+                    : (issue.status === 'Acknowledged' 
                       ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
                       : 'bg-slate-500/10 border-slate-500/30 text-slate-400'))
               }`}>
-                {issue.status === 'approved' ? 'Acknowledged' : (issue.status === 'in-progress' ? 'In Progress' : (issue.status === 'pending' || !issue.status ? 'Reported' : issue.status))}
+                {issue.status === 'Acknowledged' ? 'Acknowledged' : (issue.status === 'In Progress' ? 'In Progress' : (issue.status === 'Pending' || !issue.status ? 'Reported' : issue.status))}
               </span>
             </div>
             

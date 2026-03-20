@@ -30,10 +30,11 @@ const IssueList = React.memo(({ issues, isAdmin }) => {
   };
 
   const statusStyles = {
-    pending: 'bg-slate-800 text-slate-400',
-    'in-progress': 'bg-blue-500/20 text-blue-400',
-    resolved: 'bg-green-500/20 text-green-400',
-    rejected: 'bg-red-500/20 text-red-400',
+    'Pending': 'bg-slate-800 text-slate-400',
+    'Acknowledged': 'bg-blue-500/20 text-blue-400',
+    'In Progress': 'bg-indigo-500/20 text-indigo-400',
+    'Resolved': 'bg-green-500/20 text-green-400',
+    'Rejected': 'bg-red-500/20 text-red-400',
   };
 
   if (issues.length === 0) {
@@ -117,9 +118,9 @@ const IssueList = React.memo(({ issues, isAdmin }) => {
                     <Shield className="w-3 h-3" />
                     {issue.category || 'Unclassified'}
                   </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter ${statusStyles[issue.status] || 'bg-slate-800'}`}>
-                    {(issue.status || 'pending').replace('_', ' ')}
-                  </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter ${statusStyles[issue.status] || statusStyles['Pending']}`}>
+                      {issue.status === 'Acknowledged' ? 'Acknowledged' : (issue.status === 'In Progress' ? 'In Progress' : (issue.status === 'Pending' || !issue.status ? 'Reported' : issue.status))}
+                    </span>
                 </div>
               </div>
 

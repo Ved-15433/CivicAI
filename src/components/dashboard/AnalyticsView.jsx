@@ -41,17 +41,18 @@ const AnalyticsView = React.memo(({ complaints, loading }) => {
       const dept = normalizeDepartment(c);
       if (deptStats[dept]) {
         deptStats[dept].total++;
-        if (c.status === 'in-progress') deptStats[dept].inProgress++;
-        if (c.status === 'resolved') deptStats[dept].resolved++;
+        if (c.status === 'Acknowledged') deptStats[dept].acknowledged++;
+        if (c.status === 'In Progress') deptStats[dept].inProgress++;
+        if (c.status === 'Resolved') deptStats[dept].resolved++;
       }
     });
 
     return {
       total: complaints.length,
       citizens: complaints.reduce((sum, c) => sum + (c.unique_user_count || 1), 0),
-      acknowledged: complaints.filter(c => c.status === 'approved').length,
-      inProgress: complaints.filter(c => c.status === 'in-progress').length,
-      resolved: complaints.filter(c => c.status === 'resolved').length,
+      acknowledged: complaints.filter(c => c.status === 'Acknowledged').length,
+      inProgress: complaints.filter(c => c.status === 'In Progress').length,
+      resolved: complaints.filter(c => c.status === 'Resolved').length,
       departmentStats: deptStats
     };
   }, [complaints]);
@@ -176,18 +177,22 @@ const AnalyticsView = React.memo(({ complaints, loading }) => {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-3 gap-6">
+                  <div className="grid grid-cols-4 gap-4">
                     <div className="space-y-1">
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Reported</p>
-                      <p className="text-2xl font-black text-white">{data.total}</p>
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Reported</p>
+                      <p className="text-xl font-black text-white">{data.total}</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">In Progress</p>
-                      <p className="text-2xl font-black text-blue-400">{data.inProgress}</p>
+                      <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Ack.</p>
+                      <p className="text-xl font-black text-blue-400">{data.acknowledged || 0}</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-[10px] font-black text-green-400 uppercase tracking-widest">Resolved</p>
-                      <p className="text-2xl font-black text-green-400">{data.resolved}</p>
+                      <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Ongoing</p>
+                      <p className="text-xl font-black text-indigo-400">{data.inProgress || 0}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black text-green-400 uppercase tracking-widest">Done</p>
+                      <p className="text-xl font-black text-green-400">{data.resolved || 0}</p>
                     </div>
                   </div>
                 </div>
