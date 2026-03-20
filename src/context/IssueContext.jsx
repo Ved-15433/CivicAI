@@ -115,6 +115,64 @@ export const IssueProvider = ({ children }) => {
     }
   }, []);
 
+  const updateProfile = useCallback(async (updates) => {
+    const currentUser = userRef.current;
+    if (!currentUser) return { error: 'Not authenticated' };
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', currentUser.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      setProfile(data);
+      return { success: true, profile: data };
+    } catch (err) {
+      console.error('IssueContext: Error updating profile:', err);
+      return { error: err.message || 'Failed to update profile' };
+    }
+  }, []);
+
+  const uploadAvatar = useCallback(async (file) => {
+    const currentUser = userRef.current;
+    if (!currentUser) return { error: 'Not authenticated' };
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentUser.id}/${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // Upload file to bucket
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('profile-avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('profile-avatars')
+        .getPublicUrl(filePath);
+
+      // Update profile with new avatar URL
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', currentUser.id);
+
+      if (profileError) throw profileError;
+
+      setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
+      return { success: true, avatarUrl: publicUrl };
+    } catch (err) {
+      console.error('IssueContext: Error uploading avatar:', err);
+      return { error: err.message || 'Failed to upload avatar' };
+    }
+  }, []);
+
   const upvoteIssue = useCallback(async (issueId) => {
     const currentUser = userRef.current;
     if (!currentUser) return { error: 'Must be logged in' };
@@ -364,7 +422,9 @@ export const IssueProvider = ({ children }) => {
     refreshData,
     refreshUserReports,
     upvoteIssue,
-    updateIssue
+    updateIssue,
+    updateProfile,
+    uploadAvatar
   }), [
     user, 
     profile, 
@@ -378,7 +438,9 @@ export const IssueProvider = ({ children }) => {
     refreshData, 
     refreshUserReports,
     upvoteIssue,
-    updateIssue
+    updateIssue,
+    updateProfile,
+    uploadAvatar
   ]);
 
   return <IssueContext.Provider value={value}>{children}</IssueContext.Provider>;

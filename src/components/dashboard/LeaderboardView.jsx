@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Trophy, 
@@ -21,21 +21,12 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useIssues } from '../../context/IssueContext';
+import { ALL_BADGES, getUnlockedBadges } from '../../lib/badges';
 
 const UserStatsModal = ({ user, onClose, rank }) => {
   if (!user) return null;
 
-  const badges = [
-    { id: 'first_report', title: 'First Report', icon: MapPin, condition: user.report_count >= 1 },
-    { id: 'civic_starter', title: 'Civic Starter', icon: Award, condition: user.report_count >= 5 },
-    { id: 'power_reporter', title: 'Power Reporter', icon: Zap, condition: user.report_count >= 10 },
-    { id: 'resolved_1', title: 'Problem Solver', icon: CheckCircle2, condition: user.resolved_count >= 1 },
-    { id: 'impact_10', title: 'Voice of Ten', icon: Users, condition: (user.citizens_impacted || 0) >= 10 },
-    { id: 'high_priority', title: 'Critical Scout', icon: ShieldAlert, condition: user.high_severity_count >= 3 },
-    { id: 'civic_supporter', title: 'Civic Supporter', icon: Heart, condition: user.support_count >= 5 }
-  ];
-
-  const unlockedBadges = badges.filter(b => b.condition);
+  const unlockedBadges = getUnlockedBadges(user);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -60,12 +51,12 @@ const UserStatsModal = ({ user, onClose, rank }) => {
                  <img src={user.avatar_url} alt={user.full_name} className="w-full h-full object-cover" />
                ) : (
                  <span className="text-2xl font-black text-blue-400">
-                   {user.full_name?.[0].toUpperCase() || 'U'}
+                   {(user.username || user.full_name)?.[0].toUpperCase() || 'U'}
                  </span>
                )}
             </div>
             <div>
-              <h3 className="text-xl font-black text-white">{user.full_name || 'Volunteer'}</h3>
+              <h3 className="text-xl font-black text-white">{user.username || user.full_name || 'Volunteer'}</h3>
               <div className="flex items-center gap-2 mt-1">
                 <span className="px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-widest">
                   Rank #{rank}
@@ -83,6 +74,15 @@ const UserStatsModal = ({ user, onClose, rank }) => {
             <X className="w-6 h-6" />
           </button>
         </div>
+
+        {/* Bio */}
+        {user.bio && (
+          <div className="px-8 py-2">
+            <p className="text-sm text-slate-400 font-medium leading-relaxed italic">
+              "{user.bio}"
+            </p>
+          </div>
+        )}
 
         {/* Stats Grid */}
         <div className="px-8 py-4 grid grid-cols-2 gap-4">
@@ -102,7 +102,7 @@ const UserStatsModal = ({ user, onClose, rank }) => {
           </div>
           <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Reports Sent</p>
-             <p className="text-xl font-black text-white">{user.report_count}</p>
+             <p className="text-xl font-black text-white">{user.total_report_count || user.report_count}</p>
           </div>
           <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Resolved</p>
@@ -164,23 +164,37 @@ const LeaderboardRow = ({ rank, user, isCurrentUser, delay, onClick }) => {
         {user?.avatar_url ? (
           <img src={user.avatar_url} alt={user.full_name} className="w-full h-full object-cover" />
         ) : (
-          user?.full_name?.[0].toUpperCase() || 'U'
+          (user?.username || user?.full_name)?.[0].toUpperCase() || 'U'
         )}
       </div>
 
       {/* Info */}
       <div className="flex-grow min-w-0">
-        <h4 className={`text-sm font-bold truncate ${isCurrentUser ? 'text-white' : 'text-slate-300'}`}>
-          {user?.full_name || 'Volunteer'}
-          {isCurrentUser && <span className="ml-2 py-0.5 px-2 bg-blue-500 text-[8px] font-black uppercase rounded-full tracking-tighter">YOU</span>}
-        </h4>
+        <div className="flex items-center gap-2">
+          <h4 className={`text-sm font-bold truncate ${isCurrentUser ? 'text-white' : 'text-slate-300'}`}>
+            {user?.username || user?.full_name || 'Volunteer'}
+          </h4>
+          {isCurrentUser && <span className="py-0.5 px-2 bg-blue-500 text-[8px] font-black uppercase rounded-full tracking-tighter text-white">YOU</span>}
+          
+          <div className="flex items-center gap-1.5 ml-1">
+            {user.featured_badges?.map(badgeId => {
+              const badge = ALL_BADGES.find(b => b.id === badgeId);
+              if (!badge) return null;
+              return (
+                <div key={badgeId} title={badge.title} className="p-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                  <badge.icon className="w-3 h-3" />
+                </div>
+              );
+            })}
+          </div>
+        </div>
         <div className="flex items-center gap-3 mt-1">
            <div className="flex items-center gap-1">
              <MapPin className="w-2.5 h-2.5 text-slate-500" />
              <span className="text-[10px] font-black uppercase text-slate-500">Local Area</span>
            </div>
            <div className="w-1 h-1 rounded-full bg-slate-700" />
-           <span className="text-[10px] font-black uppercase text-slate-500">{user.report_count} reports</span>
+           <span className="text-[10px] font-black uppercase text-slate-500">{user.total_report_count || user.report_count} reports</span>
         </div>
       </div>
 
@@ -205,37 +219,46 @@ const LeaderboardRow = ({ rank, user, isCurrentUser, delay, onClick }) => {
   );
 };
 
-const LeaderboardView = () => {
+const LeaderboardView = ({ isActive }) => {
   const { user: currentUserProfile } = useIssues();
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
 
-  useEffect(() => {
-    const fetchLeaderboard = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('user_stats_view')
-          .select('*')
-          .order('xp', { ascending: false });
+  const fetchLeaderboard = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('user_stats_view')
+        .select('*')
+        .order('xp', { ascending: false });
 
-        if (error) throw error;
-        setLeaderboardData(data || []);
-      } catch (err) {
-        console.error('Error fetching leaderboard:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLeaderboard();
+      if (error) throw error;
+      setLeaderboardData(data || []);
+    } catch (err) {
+      console.error('Error fetching leaderboard:', err);
+    } finally {
+      if (isInitial) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchLeaderboard(true);
+  }, [fetchLeaderboard]);
+
+  // Re-fetch when the tab becomes active to ensure fresh profile data
+  useEffect(() => {
+    if (isActive) {
+      console.log('Leaderboard active, refreshing data...');
+      fetchLeaderboard(false);
+    }
+  }, [isActive, fetchLeaderboard]);
 
   const filteredData = useMemo(() => {
     return leaderboardData.filter(user => 
-      user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.username?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+       user.full_name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
       user.id.includes(searchTerm)
     );
   }, [leaderboardData, searchTerm]);
@@ -333,4 +356,3 @@ const LeaderboardView = () => {
 };
 
 export default LeaderboardView;
-

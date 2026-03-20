@@ -10,6 +10,7 @@ import UserComplaints from '../components/dashboard/UserComplaints';
 const ImpactView = React.lazy(() => import('../components/dashboard/ImpactView'));
 const AchievementsView = React.lazy(() => import('../components/dashboard/AchievementsView'));
 const LeaderboardView = React.lazy(() => import('../components/dashboard/LeaderboardView'));
+const ProfileView = React.lazy(() => import('../components/dashboard/ProfileView'));
 
 const TabContainer = React.memo(({ active, children }) => {
   return (
@@ -66,7 +67,13 @@ const Dashboard = () => {
 
       <TabContainer active={activeTab === 'leaderboard'}>
         <React.Suspense fallback={null}>
-          <LeaderboardView />
+          <LeaderboardView isActive={activeTab === 'leaderboard'} />
+        </React.Suspense>
+      </TabContainer>
+
+      <TabContainer active={activeTab === 'profile'}>
+        <React.Suspense fallback={null}>
+          <ProfileView />
         </React.Suspense>
       </TabContainer>
 

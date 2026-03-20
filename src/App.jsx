@@ -37,6 +37,7 @@ function App() {
                 <Route path="impact" element={null} />
                 <Route path="achievements" element={null} />
                 <Route path="leaderboard" element={null} />
+                <Route path="profile" element={null} />
               </Route>
             </Route>
 

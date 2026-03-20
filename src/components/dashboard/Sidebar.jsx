@@ -16,7 +16,7 @@ import { useIssues } from '../../context/IssueContext';
 
 const Sidebar = React.memo(({ user, isAdmin }) => {
   const navigate = useNavigate();
-  const { signOut } = useIssues();
+  const { signOut, profile } = useIssues();
 
   const userMenuItems = [
     { name: 'System Analytics', icon: BarChart3, path: '/dashboard/analytics' },
@@ -91,12 +91,21 @@ const Sidebar = React.memo(({ user, isAdmin }) => {
 
       {/* User Section */}
       <div className="mt-auto border-t border-white/5 pt-6 space-y-4">
-        <div className="flex items-center gap-3 px-4">
-          <div className="w-10 h-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-slate-400 font-bold">
-            {user?.email?.[0].toUpperCase() || 'U'}
+        <div 
+          onClick={() => navigate('/dashboard/profile')}
+          className="flex items-center gap-3 px-4 group/user cursor-pointer hover:bg-white/5 py-3 rounded-2xl transition-all"
+        >
+          <div className="w-10 h-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-slate-400 font-bold overflow-hidden transition-transform group-hover/user:scale-110">
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              (profile?.full_name || user?.email)?.[0].toUpperCase() || 'U'
+            )}
           </div>
           <div className="flex-grow min-w-0">
-            <p className="text-sm font-bold text-white truncate">{user?.email?.split('@')[0]}</p>
+            <p className="text-sm font-bold text-white truncate transition-colors group-hover/user:text-blue-400">
+              {profile?.username || profile?.full_name || user?.email?.split('@')[0]}
+            </p>
             <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
           </div>
         </div>
