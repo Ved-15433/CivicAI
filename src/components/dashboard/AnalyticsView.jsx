@@ -34,13 +34,14 @@ const AnalyticsView = React.memo(({ complaints, loading }) => {
 
     const deptStats = {};
     DEPARTMENTS.forEach(d => {
-      deptStats[d] = { total: 0, inProgress: 0, resolved: 0 };
+      deptStats[d] = { total: 0, pending: 0, acknowledged: 0, inProgress: 0, resolved: 0 };
     });
 
     complaints.forEach(c => {
       const dept = normalizeDepartment(c);
       if (deptStats[dept]) {
         deptStats[dept].total++;
+        if (c.status === 'Pending' || !c.status) deptStats[dept].pending++;
         if (c.status === 'Acknowledged') deptStats[dept].acknowledged++;
         if (c.status === 'In Progress') deptStats[dept].inProgress++;
         if (c.status === 'Resolved') deptStats[dept].resolved++;
@@ -180,7 +181,7 @@ const AnalyticsView = React.memo(({ complaints, loading }) => {
                   <div className="grid grid-cols-4 gap-4">
                     <div className="space-y-1">
                       <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Reported</p>
-                      <p className="text-xl font-black text-white">{data.total}</p>
+                      <p className="text-xl font-black text-white">{data.pending || 0}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Ack.</p>
