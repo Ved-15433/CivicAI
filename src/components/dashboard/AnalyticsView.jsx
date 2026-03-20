@@ -40,18 +40,30 @@ const AnalyticsView = React.memo(({ complaints, loading }) => {
     complaints.forEach(c => {
       const dept = normalizeDepartment(c);
       if (deptStats[dept]) {
+        // Reported = Cumulative total reports in this department
         deptStats[dept].total++;
-        if (c.status === 'Pending' || !c.status) deptStats[dept].pending++;
-        if (c.status === 'Acknowledged') deptStats[dept].acknowledged++;
-        if (c.status === 'In Progress') deptStats[dept].inProgress++;
-        if (c.status === 'Resolved') deptStats[dept].resolved++;
+        
+        // Acknowledged = Cumulative: reached Acknowledged, In Progress, or Resolved
+        if (['Acknowledged', 'In Progress', 'Resolved'].includes(c.status)) {
+          deptStats[dept].acknowledged++;
+        }
+        
+        // Ongoing = CURRENTLY In Progress
+        if (c.status === 'In Progress') {
+          deptStats[dept].inProgress++;
+        }
+        
+        // Done = Reached Resolved stage
+        if (c.status === 'Resolved') {
+          deptStats[dept].resolved++;
+        }
       }
     });
 
     return {
       total: complaints.length,
       citizens: complaints.reduce((sum, c) => sum + (c.unique_user_count || 1), 0),
-      acknowledged: complaints.filter(c => c.status === 'Acknowledged').length,
+      acknowledged: complaints.filter(c => ['Acknowledged', 'In Progress', 'Resolved'].includes(c.status)).length,
       inProgress: complaints.filter(c => c.status === 'In Progress').length,
       resolved: complaints.filter(c => c.status === 'Resolved').length,
       departmentStats: deptStats
@@ -138,7 +150,7 @@ const AnalyticsView = React.memo(({ complaints, loading }) => {
           { label: 'Total Reports', value: stats.total, color: 'blue', icon: BarChart3 },
           { label: 'Citizens Engaged', value: stats.citizens, color: 'purple', icon: Users },
           { label: 'Acknowledged', value: stats.acknowledged, color: 'amber', icon: Activity },
-          { label: 'In Progress', value: stats.inProgress, color: 'indigo', icon: Activity },
+          { label: 'Ongoing', value: stats.inProgress, color: 'indigo', icon: Activity },
           { label: 'Resolved', value: stats.resolved, color: 'green', icon: CheckCircle2 },
         ].map((item, i) => (
           <div key={i} className="glass p-6 rounded-3xl border border-white/5 relative group overflow-hidden">
@@ -181,7 +193,7 @@ const AnalyticsView = React.memo(({ complaints, loading }) => {
                   <div className="grid grid-cols-4 gap-4">
                     <div className="space-y-1">
                       <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Reported</p>
-                      <p className="text-xl font-black text-white">{data.pending || 0}</p>
+                      <p className="text-xl font-black text-white">{data.total}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Ack.</p>
