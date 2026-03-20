@@ -132,15 +132,39 @@ export const IssueProvider = ({ children }) => {
       }
 
       setUserUpvotes(prev => [...prev, data]);
-      // After upvote, we should refresh the global issues to show updated count and order
-      // But we can also let realtime handle it if it works on updates.
-      // Actually, my trigger updates 'issues' table, so realtime should catch it.
       return { success: true };
     } catch (err) {
       console.error('IssueContext: Error upvoting issue:', err);
       return { error: err.message };
     }
   }, []);
+
+  const updateIssue = useCallback(async (issueId, updates) => {
+    // 1. Optimistic local update
+    setComplaints(prev => {
+      const updated = prev.map(c => 
+        c.id === issueId ? { ...c, ...updates } : c
+      );
+      // Preserve existing sort by priority score
+      return updated.sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0));
+    });
+
+    try {
+      // 2. Remote DB update
+      const { error } = await supabase
+        .from('issues')
+        .update(updates)
+        .eq('id', issueId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (err) {
+      console.error('IssueContext: Error updating issue:', err);
+      // Revert on error - fetch fresh data to ensure consistency
+      fetchGlobalData(true);
+      return { error: err.message };
+    }
+  }, [fetchGlobalData]);
 
   // Combined initialization logic
   useEffect(() => {
@@ -238,12 +262,30 @@ export const IssueProvider = ({ children }) => {
           } else if (payload.eventType === 'DELETE') {
             setComplaints(prev => prev.filter(c => c.id !== payload.old.id));
           } else if (payload.eventType === 'UPDATE') {
+            const updatedIssue = payload.new;
+            
+            // Update global complaints array
             setComplaints(prev => {
               const updated = prev.map(c => 
-                c.id === payload.new.id ? { ...c, ...payload.new } : c
+                c.id === updatedIssue.id ? { ...c, ...updatedIssue } : c
               );
               return updated.sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0));
             });
+
+            // CRITICAL: Also update any relevant issues nested inside userReports (for the User Dashboard)
+            setUserReports(prev => prev.map(report => {
+              if (report.issues?.id === updatedIssue.id) {
+                return {
+                  ...report,
+                  issues: { ...report.issues, ...updatedIssue }
+                };
+              }
+              // Handle case where issue might be directly on the report object
+              if (report.id === updatedIssue.id || report.issue_id === updatedIssue.id) {
+                return { ...report, ...updatedIssue };
+              }
+              return report;
+            }));
           }
         }
       )
@@ -321,7 +363,8 @@ export const IssueProvider = ({ children }) => {
     signOut: handleSignOut,
     refreshData,
     refreshUserReports,
-    upvoteIssue
+    upvoteIssue,
+    updateIssue
   }), [
     user, 
     profile, 
@@ -334,7 +377,8 @@ export const IssueProvider = ({ children }) => {
     handleSignOut, 
     refreshData, 
     refreshUserReports,
-    upvoteIssue
+    upvoteIssue,
+    updateIssue
   ]);
 
   return <IssueContext.Provider value={value}>{children}</IssueContext.Provider>;

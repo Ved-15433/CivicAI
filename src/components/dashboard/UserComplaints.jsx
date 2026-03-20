@@ -20,7 +20,7 @@ import IssueDetailModal from './IssueDetailModal';
 import { useIssues } from '../../context/IssueContext';
 
 const UserComplaints = React.memo(({ userId }) => {
-  const { userReports: complaints, userReportsLoading: loading } = useIssues();
+  const { userReports: complaints, userReportsLoading: loading, isAdmin } = useIssues();
   const [deletingId, setDeletingId] = useState(null);
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -57,6 +57,13 @@ const UserComplaints = React.memo(({ userId }) => {
     completed: 'Analysis Done',
     failed: 'Analysis Failed',
     pending: 'In Queue'
+  };
+
+  const resolutionStyles = {
+    pending: 'bg-slate-800 text-slate-400',
+    approved: 'bg-blue-500/20 text-blue-400',
+    'in-progress': 'bg-indigo-500/20 text-indigo-400',
+    resolved: 'bg-green-500/20 text-green-400 border border-green-500/30'
   };
 
   if (loading && complaints.length === 0) {
@@ -154,10 +161,13 @@ const UserComplaints = React.memo(({ userId }) => {
                           <div className="flex items-center gap-1.5 text-blue-400">
                              <Sparkles className="w-3 h-3" />
                              <span className="text-[10px] font-black uppercase tracking-tighter">
-                               Score: {issue.priority_score.toFixed(1)}
+                                Score: {issue.priority_score.toFixed(1)}
                              </span>
                           </div>
                         )}
+                        <div className={`ml-auto px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter ${resolutionStyles[issue.status] || resolutionStyles.pending}`}>
+                           {issue.status === 'approved' ? 'Acknowledged' : (issue.status === 'in-progress' ? 'In Progress' : (issue.status === 'pending' || !issue.status ? 'Reported' : issue.status))}
+                        </div>
                       </div>
                     </div>
 
@@ -229,6 +239,7 @@ const UserComplaints = React.memo(({ userId }) => {
           <IssueDetailModal 
             issue={selectedIssue} 
             onClose={() => setSelectedIssue(null)} 
+            isAdmin={isAdmin}
           />
         )}
       </AnimatePresence>

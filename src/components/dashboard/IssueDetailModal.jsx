@@ -1,12 +1,18 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X, Shield, MapPin, Calendar, AlertCircle, Clock, Users, Sparkles, Building2, Heart, CheckCircle2 } from 'lucide-react';
+import { X, Shield, MapPin, Calendar, AlertCircle, Clock, Users, Sparkles, Building2, Heart, CheckCircle2, ClipboardCheck, Loader2, ClipboardList } from 'lucide-react';
 import { useIssues } from '../../context/IssueContext';
 
 import { supabase } from '../../lib/supabase';
 
-const IssueDetailModal = React.memo(({ issue, onClose, isAdmin }) => {
-  const { user, upvoteIssue, userUpvotes } = useIssues();
+const IssueDetailModal = React.memo(({ issue: initialIssue, onClose, isAdmin }) => {
+  const { user, upvoteIssue, userUpvotes, complaints, updateIssue } = useIssues();
+  
+  // Track this issue live from the global state to react to real-time status updates
+  const issue = React.useMemo(() => 
+    complaints.find(c => c.id === initialIssue.id) || initialIssue, 
+  [complaints, initialIssue]);
+
   const [updating, setUpdating] = React.useState(false);
   const [upvoting, setUpvoting] = React.useState(false);
 
@@ -30,16 +36,17 @@ const IssueDetailModal = React.memo(({ issue, onClose, isAdmin }) => {
   const updateStatus = async (newStatus) => {
     setUpdating(true);
     try {
-      const { error } = await supabase
-        .from('issues')
-        .update({ status: newStatus })
-        .eq('id', issue.id);
-
-      if (error) throw error;
-      onClose();
+      // Use the context-level updateIssue which handles optimistic local state update 
+      // + remote DB update. This ensures the progress bar reacts INSTANTLY.
+      const result = await updateIssue(issue.id, { status: newStatus });
+      
+      if (result.error) throw new Error(result.error);
+      
+      // Do not close the modal on status change to allow viewing of the progress tracker update
+      // onClose(); 
     } catch (err) {
       console.error('Error updating status:', err);
-      alert('Failed to update status');
+      alert('Failed to update status: ' + err.message);
     } finally {
       setUpdating(false);
     }
@@ -68,6 +75,73 @@ const IssueDetailModal = React.memo(({ issue, onClose, isAdmin }) => {
               {updating ? 'Updating...' : btn.label}
             </button>
           ))}
+        </div>
+      </div>
+    );
+  };
+
+  const StatusTracker = ({ status }) => {
+    const stages = [
+      { label: 'Reported', status: 'pending', icon: ClipboardList },
+      { label: 'Acknowledged', status: 'approved', icon: ClipboardCheck },
+      { label: 'In Progress', status: 'in-progress', icon: Loader2 },
+      { label: 'Resolved', status: 'resolved', icon: CheckCircle2 },
+    ];
+
+    const currentStageIndex = stages.findIndex(s => s.status === status);
+    // If status is not found (e.g. pending isn't exactly 'pending'?), default to index 0
+    const activeIndex = currentStageIndex === -1 ? 0 : currentStageIndex;
+
+    return (
+      <div className="w-full pt-4 pb-4">
+        <div className="relative flex justify-between items-center px-4">
+          {/* Background Line */}
+          <div className="absolute top-1/2 left-0 w-full h-1 bg-white/5 -translate-y-1/2 rounded-full" />
+          
+          {/* Progress Line */}
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${(activeIndex / (stages.length - 1)) * 100}%` }}
+            transition={{ duration: 0.8, ease: "circOut" }}
+            className={`absolute top-1/2 left-0 h-1 bg-gradient-to-r ${status === 'resolved' ? 'from-green-500 to-emerald-500' : 'from-blue-600 to-indigo-600'} -translate-y-1/2 rounded-full`}
+          />
+
+          {stages.map((stage, index) => {
+            const isCompleted = index < activeIndex;
+            const isCurrent = index === activeIndex;
+            const Icon = stage.icon;
+
+            return (
+              <div key={stage.label} className="relative flex flex-col items-center z-10">
+                <motion.div 
+                  initial={false}
+                  animate={isCurrent ? { scale: 1.15 } : { scale: 1 }}
+                  className={`w-10 h-10 rounded-2xl flex items-center justify-center border transition-all duration-500 ${
+                    status === 'resolved' && index === 3
+                      ? 'bg-green-500 border-green-400 text-white shadow-[0_0_20px_rgba(34,197,94,0.3)]'
+                      : isCompleted 
+                        ? 'bg-blue-500 border-blue-400 text-white' 
+                        : isCurrent 
+                          ? 'bg-slate-900 border-blue-500 text-blue-500 shadow-[0_0_25px_rgba(59,130,246,0.3)]' 
+                          : 'bg-slate-950 border-white/10 text-slate-600'
+                  }`}
+                >
+                  {isCompleted ? (
+                    <CheckCircle2 className="w-5 h-5 stroke-[2.5px]" />
+                  ) : (
+                    <Icon className={`w-5 h-5 ${isCurrent ? (stage.status === 'in-progress' ? 'animate-spin' : 'animate-pulse') : ''}`} />
+                  )}
+                </motion.div>
+                <div className="absolute top-12 whitespace-nowrap text-center">
+                  <p className={`text-[9px] font-black uppercase tracking-[0.15em] ${
+                    isCurrent ? 'text-blue-400' : isCompleted ? 'text-slate-300' : 'text-slate-600 font-bold'
+                  }`}>
+                    {stage.label}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -152,11 +226,30 @@ const IssueDetailModal = React.memo(({ issue, onClose, isAdmin }) => {
             </div>
           </div>
 
-          <div className="space-y-4">
-            <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Description</h4>
-            <p className="text-slate-300 leading-relaxed bg-white/5 p-5 rounded-2xl border border-white/5">
-              {issue.description}
-            </p>
+          <div className="space-y-6 pt-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Live Progress</h4>
+              <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter border shadow-sm ${
+                issue.status === 'resolved' 
+                  ? 'bg-green-500/10 border-green-500/30 text-green-400' 
+                  : (issue.status === 'in-progress' 
+                    ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400'
+                    : (issue.status === 'approved' 
+                      ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                      : 'bg-slate-500/10 border-slate-500/30 text-slate-400'))
+              }`}>
+                {issue.status === 'approved' ? 'Acknowledged' : (issue.status === 'in-progress' ? 'In Progress' : (issue.status === 'pending' || !issue.status ? 'Reported' : issue.status))}
+              </span>
+            </div>
+            
+            <StatusTracker status={issue.status} />
+
+            <div className="pt-8 opacity-60">
+               <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">Detailed Report</h4>
+               <p className="text-slate-400 text-sm leading-relaxed italic line-clamp-3 bg-white/5 p-4 rounded-xl border border-white/5">
+                 {issue.description}
+               </p>
+            </div>
           </div>
 
           {/* AI Prioritization Stats */}
