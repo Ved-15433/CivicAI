@@ -39,6 +39,8 @@ function App() {
                 <Route path="achievements" element={null} />
                 <Route path="leaderboard" element={null} />
                 <Route path="profile" element={null} />
+                <Route path="responsible-authorities" element={null} />
+                <Route path="responsible-authorities/:id" element={null} />
               </Route>
             </Route>
 

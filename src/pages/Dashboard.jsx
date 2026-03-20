@@ -34,11 +34,13 @@ const Dashboard = () => {
   const location = useLocation();
 
   const activeTab = useMemo(() => {
-    const segments = location.pathname.split('/');
-    const last = segments.pop();
-    if (!last || last === 'dashboard') return 'analytics';
-    return last;
+    const segments = location.pathname.split('/').filter(Boolean);
+    const dashboardIndex = segments.indexOf('dashboard');
+    if (dashboardIndex === -1 || dashboardIndex === segments.length - 1) return 'analytics';
+    return segments[dashboardIndex + 1];
   }, [location.pathname]);
+
+  const AuthoritiesView = React.lazy(() => import('../components/dashboard/AuthoritiesView'));
 
   return (
     <>
@@ -81,6 +83,12 @@ const Dashboard = () => {
       <TabContainer active={activeTab === 'profile'}>
         <React.Suspense fallback={null}>
           <ProfileView />
+        </React.Suspense>
+      </TabContainer>
+      
+      <TabContainer active={activeTab === 'responsible-authorities'}>
+        <React.Suspense fallback={null}>
+          <AuthoritiesView />
         </React.Suspense>
       </TabContainer>
 
