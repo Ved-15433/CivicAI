@@ -15,13 +15,17 @@ import {
   Filter,
   UserCheck,
   Zap,
-  Award
+  Award,
+  User,
+  CheckCircle2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useIssues } from '../../context/IssueContext';
 import PostCard from './PostCard';
 import CreatePostModal from './CreatePostModal';
 import UserProfileModal from './UserProfileModal';
+import ProfileView from './ProfileView';
+
 
 const CommunityView = () => {
   const { user, profile } = useIssues();
@@ -38,6 +42,10 @@ const CommunityView = () => {
   const userIdFromUrl = searchParams.get('user');
 
   const fetchPosts = useCallback(async () => {
+    if (filter === 'profile') {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -162,7 +170,8 @@ const CommunityView = () => {
               {[
                 { id: 'all', icon: Globe, label: 'Global Feed' },
                 { id: 'following', icon: UserCheck, label: 'My Circle' },
-                { id: 'before-after', icon: Flame, label: 'Impact Stories' }
+                { id: 'before-after', icon: Flame, label: 'Impact Stories' },
+                { id: 'profile', icon: User, label: 'My Profile' }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -179,16 +188,28 @@ const CommunityView = () => {
               ))}
             </div>
 
-            <div className="flex items-center gap-4 px-4 w-full sm:w-auto">
-               <div className="flex items-center gap-2 text-slate-500">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Latest Updates</span>
-               </div>
-            </div>
+            {filter !== 'profile' && (
+              <div className="flex items-center gap-4 px-4 w-full sm:w-auto">
+                 <div className="flex items-center gap-2 text-slate-500">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Latest Updates</span>
+                 </div>
+              </div>
+            )}
+            {filter === 'profile' && (
+              <div className="flex items-center gap-4 px-4 w-full sm:w-auto">
+                 <div className="flex items-center gap-2 text-blue-400">
+                    <User className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Your Account</span>
+                 </div>
+              </div>
+            )}
           </div>
 
-          {/* Posts List */}
-          {loading ? (
+          {/* Content Section */}
+          {filter === 'profile' ? (
+            <ProfileView hideHeader={true} />
+          ) : loading ? (
             <div className="py-24 flex flex-col items-center justify-center space-y-4">
                <div className="relative">
                  <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
@@ -238,7 +259,7 @@ const CommunityView = () => {
           )}
 
           {/* End of Feed Badge */}
-          {!loading && posts.length > 0 && (
+          {filter !== 'profile' && !loading && posts.length > 0 && (
             <div className="py-20 flex flex-col items-center space-y-6">
                <div className="w-px h-16 bg-gradient-to-b from-blue-500/50 to-transparent" />
                <div className="p-4 bg-slate-900 border border-white/10 rounded-3xl flex items-center gap-3 shadow-2xl">

@@ -17,7 +17,7 @@ import { useIssues } from '../../context/IssueContext';
 import { ALL_BADGES, getUnlockedBadges } from '../../lib/badges';
 import { supabase } from '../../lib/supabase';
 
-const ProfileView = () => {
+const ProfileView = ({ hideHeader = false }) => {
   const { profile, user, updateProfile, uploadAvatar } = useIssues();
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
@@ -128,29 +128,31 @@ const ProfileView = () => {
 
   return (
     <div className="space-y-12 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <header className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-            <span className="text-xs font-black text-blue-400 uppercase tracking-widest">User Settings</span>
+      {!hideHeader && (
+        <header className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+              <span className="text-xs font-black text-blue-400 uppercase tracking-widest">User Settings</span>
+            </div>
+            <h2 className="text-4xl font-black text-white tracking-tight">Personal Profile</h2>
+            <p className="text-slate-500 italic mt-2">Manage how you appear to the community and officials.</p>
           </div>
-          <h2 className="text-4xl font-black text-white tracking-tight">Personal Profile</h2>
-          <p className="text-slate-500 italic mt-2">Manage how you appear to the community and officials.</p>
-        </div>
-        
-        {saveStatus && (
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ${
-              saveStatus.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
-            }`}
-          >
-            {saveStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <Info className="w-4 h-4" />}
-            {saveStatus.message}
-          </motion.div>
-        )}
-      </header>
+          
+          {saveStatus && (
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                saveStatus.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+              }`}
+            >
+              {saveStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <Info className="w-4 h-4" />}
+              {saveStatus.message}
+            </motion.div>
+          )}
+        </header>
+      )}
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1 space-y-8">
