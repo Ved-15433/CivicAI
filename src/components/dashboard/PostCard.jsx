@@ -13,18 +13,23 @@ import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
-  Award
+  Award,
+  Trash2
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import { useIssues } from '../../context/IssueContext';
 
-const PostCard = ({ post, currentUserId, onFollowChange, onUserClick }) => {
+const PostCard = ({ post, currentUserId, onFollowChange, onUserClick, onDelete }) => {
   const { profile: currentUserProfile } = useIssues();
   const [isLiked, setIsLiked] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showFullContent, setShowFullContent] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   const {
     id,
@@ -36,6 +41,8 @@ const PostCard = ({ post, currentUserId, onFollowChange, onUserClick }) => {
     post_media = [],
     issues
   } = post;
+
+  const isAuthor = currentUserId === user_id;
 
   useEffect(() => {
     checkFollowStatus();
@@ -90,6 +97,47 @@ const PostCard = ({ post, currentUserId, onFollowChange, onUserClick }) => {
 
   const isLongContent = content && content.length > 150;
   const displayContent = showFullContent ? content : content?.slice(0, 150);
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      // 1. Get media paths for storage cleanup before deleting the references
+      const { data: mediaItems } = await supabase
+        .from('post_media')
+        .select('url')
+        .eq('post_id', id);
+
+      // 2. Delete from database (cascades to post_media rows)
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // 3. Clean up storage if there were media items
+      if (mediaItems && mediaItems.length > 0) {
+        const paths = mediaItems.map(item => {
+          // Extract the path after 'post-media/'
+          const match = item.url.match(/post-media\/(.+)$/);
+          return match ? match[1] : null;
+        }).filter(Boolean);
+
+        if (paths.length > 0) {
+          await supabase.storage.from('post-media').remove(paths);
+        }
+      }
+
+      setShowDeleteConfirm(false);
+      if (onDelete) onDelete(id);
+    } catch (err) {
+      console.error('Delete failed:', err);
+      setDeleteError(err.message || 'Failed to delete post');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <motion.div
@@ -252,10 +300,110 @@ const PostCard = ({ post, currentUserId, onFollowChange, onUserClick }) => {
               <span className="text-[10px] font-black uppercase">Propagate</span>
             </button>
           </div>
-          <button className="text-slate-500 hover:text-white transition-colors">
-            <MoreHorizontal className="w-6 h-6" />
-          </button>
+          <div className="relative">
+            <button 
+              onClick={() => setShowMenu(!showMenu)}
+              className={`p-2 rounded-xl transition-all ${showMenu ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`}
+            >
+              <MoreHorizontal className="w-6 h-6" />
+            </button>
+
+            <AnimatePresence>
+              {showMenu && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-[100]" 
+                    onClick={() => setShowMenu(false)}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                    className="absolute right-0 bottom-full mb-2 w-48 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-[101] overflow-hidden backdrop-blur-xl"
+                  >
+                    <div className="p-2 space-y-1">
+                      {isAuthor && (
+                        <button
+                          onClick={() => {
+                            setShowMenu(false);
+                            setShowDeleteConfirm(true);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold text-red-400 hover:bg-red-500/10 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete Post
+                        </button>
+                      )}
+                      
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          // Shared clipboard logic here if needed
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-300 hover:bg-white/5 transition-colors"
+                      >
+                        <Share2 className="w-4 h-4" />
+                        Copy Link
+                      </button>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
+
+        {/* Delete Confirmation Modal */}
+        <AnimatePresence>
+          {showDeleteConfirm && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+                onClick={() => setShowDeleteConfirm(false)}
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative w-full max-w-sm p-8 rounded-[2rem] glass border border-red-500/20 bg-slate-900 shadow-2xl text-center"
+              >
+                <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 text-red-500">
+                  <Trash2 className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Delete Post?</h3>
+                <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+                  Are you sure you want to delete this community post? This action cannot be undone.
+                </p>
+
+                {deleteError && (
+                  <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-bold">
+                    {deleteError}
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setShowDeleteConfirm(false)}
+                    disabled={isDeleting}
+                    className="flex-1 py-3 px-4 rounded-xl font-bold bg-white/5 text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="flex-1 py-3 px-4 rounded-xl font-bold bg-red-600 text-white hover:bg-red-500 transition-all shadow-lg shadow-red-500/25 flex items-center justify-center"
+                  >
+                    {isDeleting ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : "Delete"}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Text Content */}
         {content && (

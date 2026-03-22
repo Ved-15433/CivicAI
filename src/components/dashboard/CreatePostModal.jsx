@@ -24,6 +24,20 @@ const CreatePostModal = ({ isOpen, onClose, onSuccess }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
+  const isFetchedRef = useRef(false);
+
+  // Reset form when modal closes/opens
+  useEffect(() => {
+    if (!isOpen) {
+      setContent('');
+      // Revoke previews to prevent memory leaks
+      images.forEach(img => img.preview && URL.revokeObjectURL(img.preview));
+      setImages([]);
+      setSelectedIssueId(null);
+      setIsBeforeAfter(false);
+      setError(null);
+    }
+  }, [isOpen]);
 
   // Filter only resolved or in-progress issues for before/after?
   // Let's allow any issue they've reported.
@@ -247,47 +261,69 @@ const CreatePostModal = ({ isOpen, onClose, onSuccess }) => {
                         onClick={() => {
                           setSelectedIssueId(null);
                           setIsBeforeAfter(false);
+                          // Also reset image labels to standard
+                          setImages(prev => prev.map(img => ({ ...img, label: 'standard' })));
                         }}
-                        className="text-[10px] font-bold text-red-400 hover:text-red-300 transition-colors uppercase"
+                        className="text-[10px] font-bold text-red-400 hover:text-red-300 transition-colors uppercase px-3 py-1 bg-red-400/10 rounded-lg border border-red-500/20"
                      >
                        Remove Link
                      </button>
                    )}
                 </div>
 
-                <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                  {myIssues.length > 0 ? (
-                    myIssues.map((issue) => (
-                      <button
+                <div className="grid grid-cols-1 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                  {selectedIssueId ? (
+                    // Show only the selected issue card when linked
+                    myIssues.filter(issue => issue.id === selectedIssueId).map((issue) => (
+                      <div
                         key={issue.id}
-                        type="button"
-                        onClick={() => setSelectedIssueId(issue.id)}
-                        className={`flex items-center justify-between p-3 rounded-2xl border transition-all text-left ${
-                          selectedIssueId === issue.id
-                            ? 'bg-blue-600/10 border-blue-500/50 text-blue-400'
-                            : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10'
-                        }`}
+                        className="flex items-center justify-between p-4 rounded-2xl border bg-blue-600/10 border-blue-500/50 text-blue-400 animate-in fade-in zoom-in-95 duration-300"
                       >
-                        <div className="flex items-center gap-3">
-                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${selectedIssueId === issue.id ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'}`}>
-                             {selectedIssueId === issue.id ? <CheckCircle2 className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}
+                        <div className="flex items-center gap-4">
+                           <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-600 text-white shadow-lg shadow-blue-500/20">
+                             <CheckCircle2 className="w-5 h-5" />
                            </div>
                            <div className="min-w-0">
-                             <p className="text-xs font-black truncate">{issue.title}</p>
-                             <p className="text-[10px] opacity-70 truncate">{issue.location_label || 'Location not specified'}</p>
+                             <p className="text-sm font-black text-white">{issue.title}</p>
+                             <p className="text-[10px] opacity-70 truncate font-medium">{issue.location_label || 'Location not specified'}</p>
                            </div>
                         </div>
-                        <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${
-                          issue.status === 'Resolved' ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'
-                        }`}>
-                          {issue.status}
+                        <div className="flex items-center gap-3">
+                          <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${
+                            issue.status === 'Resolved' ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'
+                          }`}>
+                            {issue.status}
+                          </div>
                         </div>
-                      </button>
+                      </div>
                     ))
                   ) : (
-                    <div className="py-4 text-center bg-white/5 rounded-2xl border border-dashed border-white/10">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase">You haven't reported any issues yet.</p>
-                    </div>
+                    // Show selection list when no issue is linked
+                    myIssues.length > 0 ? (
+                      myIssues.map((issue) => (
+                        <button
+                          key={issue.id}
+                          type="button"
+                          onClick={() => setSelectedIssueId(issue.id)}
+                          className="flex items-center justify-between p-3 rounded-2xl border bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:border-white/10 transition-all text-left group"
+                        >
+                          <div className="flex items-center gap-3">
+                             <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-800 text-slate-500 group-hover:bg-slate-700 transition-colors">
+                               <LinkIcon className="w-4 h-4" />
+                             </div>
+                             <div className="min-w-0">
+                               <p className="text-xs font-black group-hover:text-white transition-colors">{issue.title}</p>
+                               <p className="text-[10px] opacity-70 truncate">{issue.location_label || 'Location not specified'}</p>
+                             </div>
+                          </div>
+                          <Plus className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                      ))
+                    ) : (
+                      <div className="py-8 text-center bg-white/5 rounded-2xl border border-dashed border-white/10">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">You haven't reported any issues yet.</p>
+                      </div>
+                    )
                   )}
                 </div>
 

@@ -53,9 +53,9 @@ const CommunityView = () => {
         .from('posts')
         .select(`
           *,
-          profiles:user_id (id, username, avatar_url, role, full_name),
+          profiles:profiles!user_id (id, username, avatar_url, role, full_name),
           post_media (*),
-          issues:issue_id (id, title, status, location_label)
+          issues:issues!issue_id (id, title, status, location_label)
         `)
         .order('created_at', { ascending: false });
 
@@ -123,6 +123,10 @@ const CommunityView = () => {
 
   const handlePostSuccess = () => {
     fetchPosts();
+  };
+
+  const handlePostDelete = (postId) => {
+    setPosts(prev => prev.filter(p => p.id !== postId));
   };
 
   return (
@@ -208,7 +212,7 @@ const CommunityView = () => {
 
           {/* Content Section */}
           {filter === 'profile' ? (
-            <ProfileView hideHeader={true} />
+            <ProfileView hideHeader={true} onUserClick={handleUserClick} />
           ) : loading ? (
             <div className="py-24 flex flex-col items-center justify-center space-y-4">
                <div className="relative">
@@ -226,6 +230,7 @@ const CommunityView = () => {
                   currentUserId={user?.id}
                   onFollowChange={fetchFollows}
                   onUserClick={handleUserClick}
+                  onDelete={handlePostDelete}
                 />
               ))}
             </div>
