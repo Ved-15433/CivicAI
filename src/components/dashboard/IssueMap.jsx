@@ -157,7 +157,7 @@ const IssueMap = () => {
     return filtered;
   }, [issues]);
 
-  if (loading && (!issues || issues.length === 0)) {
+  if (loading) {
     return (
       <div className="w-full h-[60vh] bg-slate-900/50 rounded-[2.5rem] border border-white/5 flex flex-col items-center justify-center text-slate-500 gap-4">
         <div className="w-10 h-10 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />

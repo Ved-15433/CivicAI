@@ -56,7 +56,7 @@ const PrioritizedFeed = React.memo(() => {
           </div>
         </div>
         
-        {loading && complaints.length === 0 ? (
+        {loading ? (
           <div className="py-20 flex flex-col items-center justify-center text-center">
              <div className="w-8 h-8 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mb-4" />
              <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Fetching ranked data...</p>

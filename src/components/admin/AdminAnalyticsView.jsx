@@ -135,7 +135,7 @@ const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
     return { departmentData, categoryData, severityData, timelineData };
   }, [complaints]);
 
-  if (loading && complaints.length === 0) {
+  if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh]">
         <div className="w-10 h-10 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mb-4" />

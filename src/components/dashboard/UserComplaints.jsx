@@ -66,7 +66,7 @@ const UserComplaints = React.memo(() => {
     'Resolved': 'bg-green-500/20 text-green-400 border border-green-500/30'
   };
 
-  if (loading && complaints.length === 0) {
+  if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-4" />

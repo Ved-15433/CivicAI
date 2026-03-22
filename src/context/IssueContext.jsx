@@ -279,12 +279,41 @@ export const IssueProvider = ({ children }) => {
   // Combined initialization logic
   useEffect(() => {
     let active = true;
+    let initialFetchAttempted = false;
+
+    const syncFullData = async (currentUser) => {
+      console.log('IssueContext: Syncing data for', currentUser?.id || 'guest');
+      
+      try {
+        const fetchPromises = [fetchGlobalData(true)];
+        
+        if (currentUser) {
+          fetchPromises.push(fetchProfile(currentUser.id));
+          fetchPromises.push(fetchUserReports(currentUser.id));
+          fetchPromises.push(fetchUserUpvotes(currentUser.id));
+          fetchPromises.push(fetchNotifications(currentUser.id));
+        } else {
+          // If guest, clear private data
+          setProfile(null);
+          setUserReports([]);
+          setUserUpvotes([]);
+          setNotifications([]);
+        }
+        
+        await Promise.all(fetchPromises);
+        console.log('IssueContext: Sync completed');
+      } catch (err) {
+        console.error('IssueContext: Sync failed', err);
+      }
+    };
 
     const initialize = async () => {
+      if (initialFetchAttempted) return;
+      
       console.log('INIT 1/4: Establishing session...');
       setLoading(true);
 
-      // HARD FAILSAFE: Never stay in loading more than 10s (increased for Chrome compatibility)
+      // HARD FAILSAFE: Never stay in loading more than 10s
       const timeout = setTimeout(() => {
         if (active) {
           console.warn('INIT TIMEOUT: Emergency breakout');
@@ -295,8 +324,6 @@ export const IssueProvider = ({ children }) => {
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        // SELF-HEALING: If session restore fails with 400 or invalid refresh token,
-        // it means the client state is stale/corrupted. Clear it hard.
         if (sessionError) {
           console.error('INIT ERROR: Session restore failure:', sessionError);
           if (sessionError.status === 400 || sessionError.message?.includes('Refresh Token Not Found')) {
@@ -316,70 +343,55 @@ export const IssueProvider = ({ children }) => {
         const currentUser = session?.user ?? null;
         console.log('INIT 2/4: User identification:', currentUser?.id || 'guest');
         
-        // SELF-HEALING: If no session found, clear the local admin bypass flag
         if (!currentUser) {
           localStorage.removeItem('isAdmin');
         }
         
         setUser(currentUser);
-
-        // Sync both global and user data before resolving loading
-        console.log('INIT 3/4: Data sync started');
         
-        // Use Promise.all to fetch everything important in parallel but wait for all
-        const fetchPromises = [fetchGlobalData(true)];
+        console.log('INIT 3/4: Primary data sync');
+        await syncFullData(currentUser);
         
-        if (currentUser) {
-          fetchPromises.push(fetchProfile(currentUser.id));
-          fetchPromises.push(fetchUserReports(currentUser.id));
-          fetchPromises.push(fetchUserUpvotes(currentUser.id));
-          fetchPromises.push(fetchNotifications(currentUser.id));
-        }
-        
-        await Promise.all(fetchPromises);
-        console.log('INIT 4/4: Data sync completed');
-
+        initialFetchAttempted = true;
+        console.log('INIT 4/4: Complete');
       } catch (err) {
         console.error('INIT ERROR:', err);
       } finally {
         if (active) {
-          console.log('INIT 4/4: Resolving loading state');
           setLoading(false);
           clearTimeout(timeout);
         }
       }
     };
     
+    // First-shot initialization
     initialize();
 
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const newUser = session?.user ?? null;
-      console.log('IssueContext: Auth state change [', event, '], user:', newUser?.id || 'none');
+      console.log('IssueContext: Auth event [', event, ']', newUser?.id || 'none');
       
       if (!active) return;
 
+      // Update basic state
+      setUser(newUser);
+
       if (event === 'SIGNED_OUT') {
-        setUser(null);
+        localStorage.removeItem('isAdmin');
         setProfile(null);
         setUserReports([]);
+        setUserUpvotes([]);
+        setNotifications([]);
         setLoading(false);
         return;
       }
 
-      // Update user state
-      setUser(newUser);
-
-      if (newUser) {
-        // Fetch fresh data for the new user
-        await Promise.all([
-          fetchProfile(newUser.id),
-          fetchUserReports(newUser.id),
-          fetchUserUpvotes(newUser.id),
-          fetchNotifications(newUser.id)
-        ]);
-      } else {
-        setProfile(null);
-        setUserReports([]);
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        // If we are already logged in and it's a refresh or update, just sync
+        // But if we are initializing, the initialize() function handles the first sync
+        if (initialFetchAttempted) {
+          syncFullData(newUser);
+        }
       }
     });
 
@@ -467,7 +479,7 @@ export const IssueProvider = ({ children }) => {
       authSub.unsubscribe();
       supabase.removeChannel(channel);
     };
-  }, [fetchProfile, fetchGlobalData, fetchUserReports, fetchUserUpvotes]);
+  }, [fetchProfile, fetchGlobalData, fetchUserReports, fetchUserUpvotes, fetchNotifications]);
 
   const signOut = useCallback(async () => {
     try {
