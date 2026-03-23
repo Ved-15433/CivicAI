@@ -44,6 +44,7 @@ const Sidebar = ({ user, isAdmin }) => {
     { name: 'Water Supply', icon: LayoutList, path: '/admin/water-supply' },
     { name: 'Electricity', icon: LayoutList, path: '/admin/electricity' },
     { name: 'Others', icon: LayoutList, path: '/admin/others' },
+    { name: 'Community', icon: Users, path: '/admin/community' },
   ];
 
   const menuItems = isAdmin ? adminMenuItems : userMenuItems;
@@ -147,8 +148,8 @@ const Sidebar = ({ user, isAdmin }) => {
         isOpen={isNotificationsOpen} 
         onClose={() => setIsNotificationsOpen(false)}
         onUserClick={(userId) => {
-          // If already on profile page, we might need to refresh or just navigate
-          navigate(`/dashboard/community?user=${userId}`);
+          const basePath = isAdmin ? '/admin' : '/dashboard';
+          navigate(`${basePath}/community/profile/${userId}`);
         }}
       />
     </aside>

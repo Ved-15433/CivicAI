@@ -24,8 +24,10 @@ import { useIssues } from '../../context/IssueContext';
 import { ALL_BADGES, getUnlockedBadges } from '../../lib/badges';
 import { supabase } from '../../lib/supabase';
 import { AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 const ProfileView = ({ hideHeader = false, onUserClick }) => {
+  const navigate = useNavigate();
   const { profile, user, updateProfile, uploadAvatar } = useIssues();
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
@@ -543,7 +545,11 @@ const ProfileView = ({ hideHeader = false, onUserClick }) => {
                         <button 
                           onClick={() => {
                             setShowFollowModal(false);
-                            onUserClick && onUserClick(userItem.id);
+                            if (onUserClick) {
+                              onUserClick(userItem.id);
+                            } else {
+                              navigate(`/dashboard/community/profile/${userItem.id}`);
+                            }
                           }}
                           className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600/10 text-blue-400 hover:bg-blue-600 hover:text-white text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
                         >

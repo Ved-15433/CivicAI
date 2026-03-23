@@ -9,7 +9,10 @@ import {
   User, 
   ArrowRight,
   Inbox,
-  Check
+  Check,
+  Heart,
+  MessageCircle,
+  Users
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useIssues } from '../../context/IssueContext';
@@ -22,9 +25,17 @@ const NotificationList = ({ isOpen, onClose, onUserClick }) => {
       await markNotificationAsRead(notification.id);
     }
     
-    // If it's an upvote, we can open the actor's profile
+    // Notification Click Actions
     if (notification.type === 'issue_upvote' && notification.actor_user_id) {
       onUserClick(notification.actor_user_id);
+      onClose();
+    } else if (notification.type === 'follow' && notification.actor_user_id) {
+      onUserClick(notification.actor_user_id);
+      onClose();
+    } else if ((notification.type === 'post_like' || notification.type === 'post_comment') && notification.actor_user_id) {
+      // For now, take them to the author's profile or the global community feed
+      // Ideally we'd scroll to the post, but navigating to the community section is a good start
+      onUserClick(notification.actor_user_id); 
       onClose();
     }
     // For status changes, maybe just closing the panel is enough or we could navigate to the issue
@@ -121,12 +132,20 @@ const NotificationList = ({ isOpen, onClose, onUserClick }) => {
                     <div className="flex gap-4">
                       {/* Icon based on type */}
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        notification.type === 'status_change'
-                          ? 'bg-emerald-500/10 text-emerald-400'
-                          : 'bg-indigo-500/10 text-indigo-400'
+                        notification.type === 'status_change' ? 'bg-emerald-500/10 text-emerald-400' :
+                        notification.type === 'follow' ? 'bg-blue-500/10 text-blue-400' :
+                        notification.type === 'post_like' ? 'bg-pink-500/10 text-pink-400' :
+                        notification.type === 'post_comment' ? 'bg-indigo-500/10 text-indigo-400' :
+                        'bg-orange-500/10 text-orange-400'
                       }`}>
                         {notification.type === 'status_change' ? (
                           <CheckCircle2 className="w-5 h-5" />
+                        ) : notification.type === 'follow' ? (
+                          <Users className="w-5 h-5" />
+                        ) : notification.type === 'post_like' ? (
+                          <Heart className="w-5 h-5" />
+                        ) : notification.type === 'post_comment' ? (
+                          <MessageCircle className="w-5 h-5" />
                         ) : (
                           <TrendingUp className="w-5 h-5" />
                         )}
@@ -137,7 +156,11 @@ const NotificationList = ({ isOpen, onClose, onUserClick }) => {
                           <span className={`text-[10px] font-black uppercase tracking-widest ${
                             notification.is_read ? 'text-slate-600' : 'text-blue-400'
                           }`}>
-                            {notification.type === 'status_change' ? 'Status Update' : 'Support Received'}
+                            {notification.type === 'status_change' ? 'Status Update' : 
+                             notification.type === 'follow' ? 'New Contact' :
+                             notification.type === 'post_like' ? 'Post Support' :
+                             notification.type === 'post_comment' ? 'New Discussion' :
+                             'Support Received'}
                           </span>
                           <span className="text-[10px] text-slate-500 font-bold">
                             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}

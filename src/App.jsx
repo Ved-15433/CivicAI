@@ -59,6 +59,11 @@ function AppContent() {
                   <CommunityView />
                 </React.Suspense>
               } />
+              <Route path="community/profile/:userId" element={
+                <React.Suspense fallback={null}>
+                  <CommunityView />
+                </React.Suspense>
+              } />
               <Route path="my-complaints" element={<UserComplaints />} />
               <Route path="impact" element={
                 <React.Suspense fallback={null}>
@@ -105,6 +110,16 @@ function AppContent() {
             <Route path="analytics" element={<AdminDashboard />} />
             <Route path="map" element={<AdminDashboard />} />
             <Route path=":departmentId" element={<AdminDashboard />} />
+            <Route path="community" element={
+              <React.Suspense fallback={null}>
+                <CommunityView />
+              </React.Suspense>
+            } />
+            <Route path="community/profile/:userId" element={
+              <React.Suspense fallback={null}>
+                <CommunityView />
+              </React.Suspense>
+            } />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import IssueCharts from '../dashboard/IssueCharts';
-import { BarChart3, Activity, CheckCircle2, Clock, ShieldAlert } from 'lucide-react';
+import { BarChart3, Activity, CheckCircle2, Clock, ShieldAlert, Users } from 'lucide-react';
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1'];
 
@@ -41,8 +41,9 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
+  const { citizensCount } = useIssues();
   const stats = useMemo(() => {
-    if (!complaints) return { total: 0, pending: 0, acknowledged: 0, inProgress: 0, resolved: 0, departmentStats: {} };
+    if (!complaints) return { total: 0, pending: 0, acknowledged: 0, inProgress: 0, resolved: 0, citizens: 0, departmentStats: {} };
 
     const deptStats = {};
     DEPARTMENTS.forEach(d => {
@@ -74,13 +75,14 @@ const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
 
     return {
       total: complaints.length,
+      citizens: citizensCount,
       pending: complaints.filter(c => c.status === 'Pending' || !c.status).length,
       acknowledged: complaints.filter(c => ['Acknowledged', 'In Progress', 'Resolved'].includes(c.status)).length,
       inProgress: complaints.filter(c => c.status === 'In Progress').length,
       resolved: complaints.filter(c => c.status === 'Resolved').length,
       departmentStats: deptStats
     };
-  }, [complaints]);
+  }, [complaints, citizensCount]);
 
   const chartData = useMemo(() => {
     if (!complaints || complaints.length === 0) {
@@ -160,9 +162,10 @@ const AdminAnalyticsView = React.memo(({ complaints, loading }) => {
       </header>
 
       {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
         {[
           { label: 'Total Complaints', value: stats.total, color: 'blue', icon: BarChart3 },
+          { label: 'Citizens Engaged', value: stats.citizens, color: 'purple', icon: Users },
           { label: 'Pending', value: stats.pending, color: 'slate', icon: Clock },
           { label: 'Acknowledged', value: stats.acknowledged, color: 'amber', icon: Activity },
           { label: 'Ongoing', value: stats.inProgress, color: 'indigo', icon: Activity },

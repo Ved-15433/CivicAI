@@ -30,7 +30,7 @@ const normalizeDepartment = (issue) => {
 };
 
 const AnalyticsView = React.memo(() => {
-  const { complaints, loading } = useIssues();
+  const { complaints, citizensCount, loading } = useIssues();
   const stats = useMemo(() => {
     if (!complaints) return { total: 0, citizens: 0, acknowledged: 0, inProgress: 0, resolved: 0, departmentStats: {} };
 
@@ -64,13 +64,13 @@ const AnalyticsView = React.memo(() => {
 
     return {
       total: complaints.length,
-      citizens: complaints.reduce((sum, c) => sum + (c.unique_user_count || 1), 0),
+      citizens: citizensCount,
       acknowledged: complaints.filter(c => ['Acknowledged', 'In Progress', 'Resolved'].includes(c.status)).length,
       inProgress: complaints.filter(c => c.status === 'In Progress').length,
       resolved: complaints.filter(c => c.status === 'Resolved').length,
       departmentStats: deptStats
     };
-  }, [complaints]);
+  }, [complaints, citizensCount]);
 
   const chartData = useMemo(() => {
     if (!complaints || complaints.length === 0) {

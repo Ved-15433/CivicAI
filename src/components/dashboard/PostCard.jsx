@@ -21,7 +21,7 @@ import { supabase } from '../../lib/supabase';
 import { useIssues } from '../../context/IssueContext';
 
 const PostCard = ({ post, currentUserId, onFollowChange, onUserClick, onDelete }) => {
-  const { profile: currentUserProfile } = useIssues();
+  const { profile: currentUserProfile, isAdmin } = useIssues();
   const [isLiked, setIsLiked] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -30,6 +30,12 @@ const PostCard = ({ post, currentUserId, onFollowChange, onUserClick, onDelete }
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  const [likesCount, setLikesCount] = useState(0);
+  const [commentsCount, setCommentsCount] = useState(0);
+  const [comments, setComments] = useState([]);
+  const [showComments, setShowComments] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
   const {
     id,
@@ -46,7 +52,146 @@ const PostCard = ({ post, currentUserId, onFollowChange, onUserClick, onDelete }
 
   useEffect(() => {
     checkFollowStatus();
+    checkLikeStatus();
+    fetchCounts();
   }, [user_id, currentUserId]);
+
+  const fetchCounts = async () => {
+    try {
+      // Fetch Likes Count
+      const { count: lCount } = await supabase
+        .from('post_likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('post_id', id);
+      setLikesCount(lCount || 0);
+
+      // Fetch Comments Count
+      const { count: cCount } = await supabase
+        .from('post_comments')
+        .select('*', { count: 'exact', head: true })
+        .eq('post_id', id);
+      setCommentsCount(cCount || 0);
+    } catch (err) {
+      console.error('Error fetching counts:', err);
+    }
+  };
+
+  const fetchComments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('post_comments')
+        .select(`
+          *,
+          profiles:user_id (username, avatar_url)
+        `)
+        .eq('post_id', id)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      setComments(data || []);
+    } catch (err) {
+      console.error('Error fetching comments:', err);
+    }
+  };
+
+  const checkLikeStatus = async () => {
+    if (!currentUserId) return;
+    try {
+      const { data } = await supabase
+        .from('post_likes')
+        .select('*')
+        .eq('post_id', id)
+        .eq('user_id', currentUserId)
+        .maybeSingle();
+      
+      setIsLiked(!!data);
+    } catch (err) {
+      console.error('Error checking like status:', err);
+    }
+  };
+
+  const handleLike = async () => {
+    if (!currentUserId) return;
+    
+    // Optimistic UI
+    const previousLiked = isLiked;
+    const previousCount = likesCount;
+    setIsLiked(!previousLiked);
+    setLikesCount(prev => previousLiked ? prev - 1 : prev + 1);
+
+    try {
+      if (previousLiked) {
+        await supabase
+          .from('post_likes')
+          .delete()
+          .eq('post_id', id)
+          .eq('user_id', currentUserId);
+      } else {
+        await supabase
+          .from('post_likes')
+          .insert({ post_id: id, user_id: currentUserId });
+      }
+    } catch (err) {
+      console.error('Error toggling like:', err);
+      // Revert on error
+      setIsLiked(previousLiked);
+      setLikesCount(previousCount);
+    }
+  };
+
+  const handleAddComment = async (e) => {
+    e.preventDefault();
+    if (!currentUserId || !newComment.trim() || isSubmittingComment) return;
+
+    setIsSubmittingComment(true);
+    try {
+      const { data, error } = await supabase
+        .from('post_comments')
+        .insert({
+          post_id: id,
+          user_id: currentUserId,
+          content: newComment.trim()
+        })
+        .select(`
+          *,
+          profiles:user_id (username, avatar_url)
+        `)
+        .single();
+
+      if (error) throw error;
+
+      setComments(prev => [...prev, data]);
+      setCommentsCount(prev => prev + 1);
+      setNewComment('');
+    } catch (err) {
+      console.error('Error adding comment:', err);
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    try {
+      const { error } = await supabase
+        .from('post_comments')
+        .delete()
+        .eq('id', commentId);
+
+      if (error) throw error;
+      setComments(prev => prev.filter(c => c.id !== commentId));
+      setCommentsCount(prev => prev - 1);
+    } catch (err) {
+      console.error('Error deleting comment:', err);
+    }
+  };
+
+  const toggleComments = () => {
+    const nextShow = !showComments;
+    setShowComments(nextShow);
+    if (nextShow && comments.length === 0) {
+      fetchComments();
+    }
+  };
 
   const checkFollowStatus = async () => {
     if (!currentUserId || user_id === currentUserId) return;
@@ -285,15 +430,24 @@ const PostCard = ({ post, currentUserId, onFollowChange, onUserClick, onDelete }
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button 
-              onClick={() => setIsLiked(!isLiked)}
+              onClick={handleLike}
               className={`flex items-center gap-2 group/btn ${isLiked ? 'text-pink-500' : 'text-slate-400 hover:text-pink-500'}`}
             >
               <Heart className={`w-6 h-6 transition-transform group-active/btn:scale-125 ${isLiked ? 'fill-current' : ''}`} />
-              <span className="text-[10px] font-black uppercase">Support</span>
+              <div className="flex flex-col items-start">
+                <span className="text-[10px] font-black uppercase">Support</span>
+                <span className="text-[8px] font-bold opacity-60 leading-none">{likesCount} Liked</span>
+              </div>
             </button>
-            <button className="flex items-center gap-2 text-slate-400 hover:text-blue-400 transition-colors group/btn">
-              <MessageCircle className="w-6 h-6 group-active/btn:scale-125 transition-transform" />
-              <span className="text-[10px] font-black uppercase">Discuss</span>
+            <button 
+              onClick={toggleComments}
+              className={`flex items-center gap-2 group/btn transition-colors ${showComments ? 'text-blue-400' : 'text-slate-400 hover:text-blue-400'}`}
+            >
+              <MessageCircle className={`w-6 h-6 group-active/btn:scale-125 transition-transform ${showComments ? 'fill-current/20' : ''}`} />
+              <div className="flex flex-col items-start">
+                <span className="text-[10px] font-black uppercase">Discuss</span>
+                <span className="text-[8px] font-bold opacity-60 leading-none">{commentsCount} Active</span>
+              </div>
             </button>
             <button className="flex items-center gap-2 text-slate-400 hover:text-green-500 transition-colors group/btn">
               <Share2 className="w-6 h-6 group-active/btn:scale-125 transition-transform" />
@@ -322,7 +476,7 @@ const PostCard = ({ post, currentUserId, onFollowChange, onUserClick, onDelete }
                     className="absolute right-0 bottom-full mb-2 w-48 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-[101] overflow-hidden backdrop-blur-xl"
                   >
                     <div className="p-2 space-y-1">
-                      {isAuthor && (
+                      {(isAuthor || isAdmin) && (
                         <button
                           onClick={() => {
                             setShowMenu(false);
@@ -331,7 +485,7 @@ const PostCard = ({ post, currentUserId, onFollowChange, onUserClick, onDelete }
                           className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold text-red-400 hover:bg-red-500/10 transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
-                          Delete Post
+                          {isAdmin && !isAuthor ? 'Admin: Delete Post' : 'Delete Post'}
                         </button>
                       )}
                       
@@ -441,6 +595,91 @@ const PostCard = ({ post, currentUserId, onFollowChange, onUserClick, onDelete }
               </div>
            </div>
         )}
+
+        {/* Post Discussion Section */}
+        <AnimatePresence>
+          {showComments && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden space-y-4 pt-4 border-t border-white/5"
+            >
+              {/* Comment List */}
+              <div className="space-y-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                {comments.length === 0 ? (
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center py-4">
+                    Be the first to share your thoughts
+                  </p>
+                ) : (
+                  comments.map((comment) => (
+                    <div key={comment.id} className="flex gap-3 group/comment relative">
+                      <div className="w-7 h-7 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-[10px] font-bold text-slate-400 overflow-hidden shrink-0">
+                        {comment.profiles?.avatar_url ? (
+                          <img src={comment.profiles.avatar_url} alt="user" className="w-full h-full object-cover" />
+                        ) : (
+                          comment.profiles?.username?.[0]?.toUpperCase() || 'U'
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                             <span className="text-[11px] font-black text-white">{comment.profiles?.username || 'Civic User'}</span>
+                             <span className="text-[9px] font-bold text-slate-500 uppercase">
+                               {formatDistanceToNow(new Date(comment.created_at))} ago
+                             </span>
+                          </div>
+                          {(isAdmin || comment.user_id === currentUserId) && (
+                            <button 
+                              onClick={() => handleDeleteComment(comment.id)}
+                              className="p-1.5 opacity-0 group-hover/comment:opacity-100 transition-all text-slate-500 hover:text-red-400 rounded-lg hover:bg-red-500/10"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-300 leading-relaxed font-medium">
+                          {comment.content}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Add Comment Input */}
+              {currentUserId && (
+                <form onSubmit={handleAddComment} className="relative flex items-center gap-3 pt-2">
+                  <div className="w-8 h-8 rounded-full bg-blue-600/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                    {currentUserProfile?.avatar_url ? (
+                      <img src={currentUserProfile.avatar_url} alt="current user" className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                      currentUserProfile?.username?.[0]?.toUpperCase() || 'U'
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Contribute to the dialogue..."
+                    className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!newComment.trim() || isSubmittingComment}
+                    className="p-2 rounded-xl bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20"
+                  >
+                    {isSubmittingComment ? (
+                      <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <TrendingUp className="w-4 h-4" />
+                    )}
+                  </button>
+                </form>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );

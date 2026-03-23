@@ -19,6 +19,8 @@ const DEPT_MAPPING: Record<string, string> = {
   "Others": "ee1f6eff-b806-4802-8643-bfc28267dcd4"
 };
 
+const ALLOWED_CATEGORIES = Object.keys(DEPT_MAPPING);
+
 function uint8ArrayToBase64(uint8Array: Uint8Array): string {
   let binary = "";
   for (let i = 0; i < uint8Array.byteLength; i++) {
@@ -84,6 +86,7 @@ Deno.serve(async (req: Request) => {
     Analyze this civic complaint description and image (if provided).
     Return ONLY raw JSON with: is_fake, rejection_reason, category, severity(1-5), urgency(1-5), public_impact(1-5), ai_summary, resolution_prediction, visual_description.
     - visual_description: Provide a highly detailed technical description of the object/issue in the image (e.g., "Circular pothole approximately 2 feet wide on asphalt surface near a storm drain").
+    - category: Choose ONLY from: [${ALLOWED_CATEGORIES.join(", ")}].
     Description: ${description || "No description provided."}` }];
 
     if (image_url) {
@@ -109,7 +112,7 @@ Deno.serve(async (req: Request) => {
     await logToDB("DEBUG", "STAGE 4: Image handling complete");
 
     // STAGE 5: Initial Gemini Analysis Started
-    const modelName = "gemini-2.5-flash"; 
+    const modelName = "gemini-1.5-flash"; // Fixed to stable model
     const gUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
     
     await logToDB("INFO", "STAGE 5: Initial Gemini analysis started", { model: modelName });
@@ -276,7 +279,8 @@ Deno.serve(async (req: Request) => {
         ai_summary: aiData.ai_summary,
         visual_description: aiData.visual_description,
         department_id: deptId,
-        image_url
+        image_url,
+        status: 'Pending' // Explicitly set to 'Pending' (capitalized) to match DB constraint
       }).select().single();
       
       if (iErr) {

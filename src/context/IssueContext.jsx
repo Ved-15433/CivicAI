@@ -10,6 +10,7 @@ export const IssueProvider = ({ children }) => {
   const [userUpvotes, setUserUpvotes] = useState([]);
   const [profile, setProfile] = useState(null);
   const [notifications, setNotifications] = useState([]);
+  const [citizensCount, setCitizensCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [userReportsLoading, setUserReportsLoading] = useState(false);
   const isFetchedRef = useRef(false);
@@ -72,6 +73,16 @@ export const IssueProvider = ({ children }) => {
     }
   }, []);
 
+  const fetchCitizensCount = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_citizens_engaged_count');
+      if (error) throw error;
+      setCitizensCount(Number(data) || 0);
+    } catch (err) {
+      console.error('IssueContext: Error fetching citizens count:', err);
+    }
+  }, []);
+
   const fetchUserReports = useCallback(async (userId) => {
     if (!userId) {
       setUserReports([]);
@@ -129,7 +140,8 @@ export const IssueProvider = ({ children }) => {
           *,
           actor:profiles!actor_user_id(username, avatar_url, role, id),
           issue:related_issue_id(*),
-          complaint:related_complaint_id(*)
+          complaint:related_complaint_id(*),
+          post:related_post_id(*)
         `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
@@ -285,7 +297,10 @@ export const IssueProvider = ({ children }) => {
       console.log('IssueContext: Syncing data for', currentUser?.id || 'guest');
       
       try {
-        const fetchPromises = [fetchGlobalData(true)];
+        const fetchPromises = [
+          fetchGlobalData(true),
+          fetchCitizensCount()
+        ];
         
         if (currentUser) {
           fetchPromises.push(fetchProfile(currentUser.id));
@@ -510,7 +525,10 @@ export const IssueProvider = ({ children }) => {
     await signOut();
   }, [signOut]);
 
-  const refreshData = useCallback(() => fetchGlobalData(true), [fetchGlobalData]);
+  const refreshData = useCallback(() => {
+    fetchGlobalData(true);
+    fetchCitizensCount();
+  }, [fetchGlobalData, fetchCitizensCount]);
   
   const refreshUserReports = useCallback(() => {
     if (user) fetchUserReports(user.id);
@@ -521,6 +539,7 @@ export const IssueProvider = ({ children }) => {
     profile,
     isAdmin,
     complaints,
+    citizensCount,
     userReports,
     userUpvotes,
     loading,
@@ -540,6 +559,7 @@ export const IssueProvider = ({ children }) => {
     profile, 
     isAdmin, 
     complaints, 
+    citizensCount,
     userReports, 
     userUpvotes,
     loading, 

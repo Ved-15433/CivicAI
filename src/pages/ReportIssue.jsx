@@ -120,37 +120,40 @@ const ReportIssue = () => {
       // IMPROVED ERROR HANDLING
       if (aiError) {
         console.error("Edge Function Invoke Error:", aiError);
-        let errorMessage = "AI processing failed. Please try again.";
-        if (aiError.context?.json) {
-           errorMessage = aiError.context.json.error || errorMessage;
-        } else if (aiError.message) {
-           errorMessage = aiError.message;
+        let errorMessage = "System error during AI processing. Please check connection and try again.";
+        
+        if (aiError.message) {
+          errorMessage = `AI Processing Error: ${aiError.message}`;
         }
+
         setErrorState(errorMessage);
         setAiProcessing(false);
         setLoading(false);
         return;
       }
 
-      // PRIORITIZE STATUS CHECKS
+      // HANDLE DUPLICATES
       if (aiResponse?.status === 'duplicate_user' || aiResponse?.status === 'duplicate') {
         setSubmissionStatus('duplicate');
-        setErrorState(null); // Clear error since we're showing the success screen for duplicates
+        setErrorState(null);
         setAiProcessing(false);
         setLoading(false);
         setSubmitted(true);
         return;
       }
 
+      // HANDLE AI REJECTIONS (REJECTED STATUS)
       if (aiResponse?.status === 'rejected') {
-        setErrorState(aiResponse.error || "Report rejected by AI analysis.");
+        setErrorState(aiResponse.error || "This report was identified as invalid or out of scope by our AI analyst.");
+        setSubmissionStatus('rejected');
         setAiProcessing(false);
         setLoading(false);
         return;
       }
 
+      // HANDLE GENERAL FAILURES
       if (aiResponse?.success === false) {
-        setErrorState(aiResponse.error || "AI Analysis failed to process this report.");
+        setErrorState(aiResponse.error || "The AI analysis encountered a logical error. Please try again with a different description.");
         setAiProcessing(false);
         setLoading(false);
         return;
@@ -159,10 +162,8 @@ const ReportIssue = () => {
       setSubmissionStatus(aiResponse?.status === 'matched' ? 'matched' : 'new');
       setAiResult(aiResponse.data);
 
-      // Refresh global state so dashboard is updated immediately
       refreshData();
       refreshUserReports();
-      
       setSubmitted(true);
     } catch (err) {
       console.error("Submission error:", err);
